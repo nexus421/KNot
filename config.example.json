@@ -1,0 +1,41 @@
+{
+  "listenHost": "127.0.0.1",
+  "listenPort": 8080,
+  "sendSystemMails": true,
+  "rateLimitPerMinute": 10,
+  "allowApiKeyInQuery": false,
+  "default": {
+    "name": "ops",
+    "apiKey": "REPLACE_ME_WITH_A_LONG_RANDOM_KEY",
+    "to": "ops@example.com",
+    "subjectPrefix": "[KNot] ",
+    "bodyPrefix": "",
+    "bodyPostfix": "",
+    "smtp": {
+      "host": "smtp.example.com",
+      "port": 587,
+      "username": "knot@example.com",
+      "password": "REPLACE_ME",
+      "from": "knot@example.com",
+      "tls": "starttls"
+    }
+  },
+  "targets": [
+    {
+      "name": "grafana",
+      "apiKey": "REPLACE_ME_WITH_ANOTHER_LONG_RANDOM_KEY",
+      "to": "alerts@example.com",
+      "subjectPrefix": "[Grafana] ",
+      "bodyPrefix": "",
+      "bodyPostfix": "\n\n-- sent by KNot",
+      "smtp": {
+        "host": "smtp.example.com",
+        "port": 587,
+        "username": "knot@example.com",
+        "password": "REPLACE_ME",
+        "from": "knot@example.com",
+        "tls": "starttls"
+      }
+    }
+  ]
+}

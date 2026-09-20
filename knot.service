@@ -1,0 +1,27 @@
+[Unit]
+Description=KNot - Webhook to SMTP Mail
+# network-online: the startup mail needs DNS and a route right away, network.target alone is too early after a reboot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/knot
+ExecStart=/usr/bin/java -jar /opt/knot/knot.jar config=/opt/knot/config.json
+Restart=on-failure
+RestartSec=5
+# 78 (EX_CONFIG): the config file was rejected or the address could not be bound - fix it, then `systemctl restart knot`
+RestartPreventExitStatus=78
+# 143: the JVM's exit code after a SIGTERM (systemctl stop), which is a clean stop, not a failure
+SuccessExitStatus=143
+User=knot
+
+# KNot writes nothing but its log; keep the rest of the system out of reach
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
