@@ -7,6 +7,7 @@ import bayern.kickner.knot.cli.sendTestMail
 import bayern.kickner.knot.config.AppConfig
 import bayern.kickner.knot.config.loadConfig
 import bayern.kickner.knot.notify.SystemNotifier
+import bayern.kickner.knot.notify.timestampFormat
 import bayern.kickner.knot.mail.MailSender
 import bayern.kickner.knot.ratelimit.RateLimiter
 import bayern.kickner.knot.routes.healthRoute
@@ -28,6 +29,8 @@ import kotlinx.coroutines.runBlocking
 import kotnexlib.ArgsInterpreter
 import kotnexlib.ResultOf
 import kotnexlib.ResultOf2
+import java.time.Instant
+import java.time.ZoneId
 import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
@@ -42,8 +45,9 @@ private const val EXIT_CONFIG_ERROR = 78
 /** Alert texts are short. Anything bigger is a mistake or an attempt to exhaust memory. */
 private const val MAX_BODY_BYTES = 256L * 1024
 
-/** From the JAR manifest (`Implementation-Version`), "dev" when running from compiled classes. */
-private val appVersion: String = AppConfig::class.java.`package`?.implementationVersion ?: "dev"
+/** Version and build time for the log banner and the mails, e.g. `1.0.0 (built 2026-09-20 12:06:19 CEST)`. */
+internal val appVersion: String =
+    "${BuildConfig.VERSION} (built ${Instant.ofEpochMilli(BuildConfig.BUILD_TIME).atZone(ZoneId.systemDefault()).format(timestampFormat)})"
 
 val globalScope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName("global"))
 

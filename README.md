@@ -1,5 +1,12 @@
 # KNot
 
+[![Tests](https://github.com/nexus421/KNot/actions/workflows/test.yml/badge.svg)](https://github.com/nexus421/KNot/actions/workflows/test.yml)
+![Kotlin](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fnexus421%2FKNot%2Fmaster%2Fbuild.gradle.kts&search=kotlin%5C%28%22jvm%22%5C%29%20version%20%22%28%5B%5E%22%5D%2B%29%22&replace=%241&label=Kotlin&logo=kotlin&logoColor=white&color=7F52FF)
+![Ktor](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fnexus421%2FKNot%2Fmaster%2Fbuild.gradle.kts&search=id%5C%28%22io%5C.ktor%5C.plugin%22%5C%29%20version%20%22%28%5B%5E%22%5D%2B%29%22&replace=%241&label=Ktor&logo=ktor&logoColor=white&color=087CFA)
+![JDK](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2Fnexus421%2FKNot%2Fmaster%2Fbuild.gradle.kts&search=JavaLanguageVersion%5C.of%5C%28%28%5Cd%2B%29%5C%29&replace=%241%20%28Corretto%29&label=JDK&logo=openjdk&logoColor=white&color=ED8B00)
+[![Release](https://img.shields.io/github/v/release/nexus421/KNot)](https://github.com/nexus421/KNot/releases)
+[![License](https://img.shields.io/github/license/nexus421/KNot)](LICENSE)
+
 **K**otlin **Not**ification: a small webhook-to-mail bridge. KNot accepts an HTTP webhook and sends its content
 as a plain-text e-mail over SMTP. It exists for services that can call a webhook but cannot send mail
 themselves — Grafana alerts, CI/CD pipelines, uptime checks, small internal tools.
@@ -171,8 +178,8 @@ passwords are ever logged.
 
 ## Deployment
 
-[knot.service](knot.service) runs KNot as root from `/root/knot` with `/usr/bin/java`. As root on the target
-machine:
+[knot.service](knot.service) runs KNot as root from `/root/knot` with `/usr/bin/java`. Build `knot.jar` yourself
+or take it from the [Releases](https://github.com/nexus421/KNot/releases) page. As root on the target machine:
 
 ```bash
 ./gradlew buildFatJar                                      # -> build/libs/knot.jar
