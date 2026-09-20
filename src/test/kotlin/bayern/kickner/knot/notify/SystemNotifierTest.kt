@@ -12,6 +12,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private val fixedTime = ZonedDateTime.of(2026, 9, 19, 18, 40, 12, 0, ZoneId.of("Europe/Berlin"))
 
@@ -64,6 +66,19 @@ class SystemNotifierTest {
         assertContains(body, "node-1")
         assertContains(body, "2026-09-19 18:40:12")
         assertTrue(body.contains("grafana-key").not(), "the API key must not be part of the mail")
+    }
+
+    @Test
+    fun `shutdown does not wait for retries beyond the timeout`() {
+        val transport = RecordingTransport(failures = 3)
+        val notifier = SystemNotifier(testTarget(), MailSender(transport, listOf(2.seconds, 2.seconds)), version = "1.2.3", hostname = "node-1")
+
+        val started = System.nanoTime()
+        notifier.notifyStopped(timeout = 200.milliseconds)
+        val elapsedMillis = (System.nanoTime() - started) / 1_000_000
+
+        assertEquals(1, transport.calls, "the timeout must cancel the pause before the second attempt")
+        assertTrue(elapsedMillis < 1_500, "notifyStopped blocked for $elapsedMillis ms")
     }
 
     @Test

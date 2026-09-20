@@ -137,23 +137,29 @@ class HookRouteTest {
     }
 
     @Test
-    fun `missing or blank body is a bad request`() = testApplication {
+    fun `missing, null or blank body is rejected naming the field`() = testApplication {
         val transport = RecordingTransport()
         knotApp(transport = transport)
 
-        assertEquals(HttpStatusCode.BadRequest, hook(apiKey = OPS_KEY, body = """{"subject": "s"}""").status)
-        assertEquals(HttpStatusCode.BadRequest, hook(apiKey = OPS_KEY, body = """{"body": "  "}""").status)
-        assertEquals(HttpStatusCode.BadRequest, hook(apiKey = OPS_KEY, body = """{"body": 42}""").status)
+        for (payload in listOf("""{"subject": "s"}""", """{"body": null}""", """{"body": "  "}""")) {
+            val response = hook(apiKey = OPS_KEY, body = payload)
+            assertEquals(HttpStatusCode.BadRequest, response.status, payload)
+            assertEquals("Field 'body' must not be empty", response.bodyAsText(), payload)
+        }
         assertEquals(0, transport.calls)
     }
 
     @Test
-    fun `invalid json is a bad request`() = testApplication {
-        knotApp()
+    fun `broken json or a wrong field type is rejected as invalid payload`() = testApplication {
+        val transport = RecordingTransport()
+        knotApp(transport = transport)
 
-        val response = hook(apiKey = OPS_KEY, body = "not json")
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
+        for (payload in listOf("not json", """{"body": 42}""")) {
+            val response = hook(apiKey = OPS_KEY, body = payload)
+            assertEquals(HttpStatusCode.BadRequest, response.status, payload)
+            assertEquals("Invalid JSON payload", response.bodyAsText(), payload)
+        }
+        assertEquals(0, transport.calls)
     }
 
     @Test

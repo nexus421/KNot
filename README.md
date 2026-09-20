@@ -5,8 +5,8 @@ as a plain-text e-mail over SMTP. It exists for services that can call a webhook
 themselves — Grafana alerts, CI/CD pipelines, uptime checks, small internal tools.
 
 KISS by design: no UI, no database, no runtime configuration. One JSON config file, one fat JAR, one systemd
-service. TLS termination is left to a reverse proxy (e.g. Caddy, Zoraxy); KNot itself listens on plain HTTP, by default
-only on `127.0.0.1`.
+service. TLS termination is left to a reverse proxy (e.g. Caddy, Zoraxy); KNot itself listens on plain HTTP,
+by default only on `127.0.0.1`.
 
 ## Quick start
 
@@ -20,30 +20,6 @@ cp config.example.json config.json   # then fill in API keys, recipients and SMT
 java -jar build/libs/knot.jar config=/path/to/config.json
 ```
 
-### Command line
-
-| Argument        | Default       | Description                                                                   |
-|-----------------|---------------|-------------------------------------------------------------------------------|
-| `config=<path>` | `config.json` | Config file to load (see Configuration).                                      |
-| `key`           | —             | Prints a fresh API key for a target and exits; needs no config file. Only the key goes to stdout, the hint to stderr, so `KEY=$(java -jar knot.jar key)` captures just the key. |
-| `test=<name>`   | —             | Sends one test mail through the target named `<name>` and exits. No server. The config is loaded and validated like on a normal start. The mail carries the target's prefixes, so they are checked as well. |
-
-Without `key` or `test=`, KNot starts the server. Exit codes:
-
-| Code  | Meaning                                                                                        |
-|-------|------------------------------------------------------------------------------------------------|
-| `0`   | `key` printed, or the test mail was delivered.                                                 |
-| `1`   | `test=`: the target is unknown, or the delivery failed after all retries — the log says why.   |
-| `78`  | The config file was rejected, or (server) the address could not be bound. See Deployment.      |
-| `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.            |
-
-Examples:
-
-```bash
-java -jar build/libs/knot.jar key
-java -jar build/libs/knot.jar test=ops config=/root/knot/config.json
-```
-
 With the server running, send a hook:
 
 ```bash
@@ -55,14 +31,35 @@ curl -X POST http://127.0.0.1:8080/hook \
 
 Tests: `./gradlew test` — GitHub Actions runs them on every push (`.github/workflows/test.yml`).
 
+## Command line
+
+| Argument        | Default       | Description                                                                   |
+|-----------------|---------------|-------------------------------------------------------------------------------|
+| `config=<path>` | `config.json` | Config file to load (see Configuration).                                      |
+| `key`           | —             | Prints a fresh API key and exits. Needs no config. Only the key goes to stdout (the hint to stderr), so `KEY=$(java -jar knot.jar key)` captures just the key. |
+| `test=<name>`   | —             | Sends one test mail through the target `<name>` and exits without starting the server. The config is validated as on a normal start, and the mail carries the target's prefixes, so those are checked too. |
+
+Without `key` or `test=`, KNot starts the server. Exit codes:
+
+| Code  | Meaning                                                                                            |
+|-------|----------------------------------------------------------------------------------------------------|
+| `0`   | `key` printed, or the test mail was delivered.                                                     |
+| `1`   | `test=`: the target is unknown, or the delivery failed after all retries — the log says why.       |
+| `78`  | The config file is missing or invalid, or (server) the address could not be bound. See Deployment. |
+| `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.                |
+
+```bash
+java -jar build/libs/knot.jar key
+java -jar build/libs/knot.jar test=ops config=/path/to/config.json
+```
+
 ## Configuration
 
-One JSON file, `config.json` in the working directory by default; override with the `config=<path>` argument.
-The file is read once at startup — after a change, restart the service. A syntax error is reported with its
-position; validation problems (blank fields, bad addresses, duplicate keys, ...) are all reported at once. In
-both cases KNot exits with code 78 (`EX_CONFIG`) instead of running with a half-valid config — the same happens
-when the configured address cannot be bound, e.g. because the port is taken. Unknown keys are errors too, so a
-typo cannot silently fall back to a default.
+One JSON file, `config.json` in the working directory by default (`config=<path>` overrides). It is read once
+at startup, so restart after a change. A syntax error is reported with its position, validation problems
+(blank fields, bad addresses, duplicate keys, ...) all at once, and unknown keys are errors too, so a typo
+cannot silently fall back to a default. In every case KNot exits with code 78 (`EX_CONFIG`) instead of running
+with a half-valid config.
 
 | Field                     | Type           | Default       | Description                                                                 |
 |---------------------------|----------------|---------------|-----------------------------------------------------------------------------|
@@ -123,6 +120,17 @@ Nothing is inserted between the parts — put a trailing space or a line break i
 | `429`  | Rate limit of the target exceeded; nothing was sent.           |
 | `502`  | SMTP delivery failed after all retries; details are in the log.|
 
+From Kotlin with the [Ktor client](https://ktor.io/docs/client-requests.html) (any engine, no content
+negotiation needed):
+
+```kotlin
+val response = client.post("https://knot.example.com/hook") {
+    header("X-API-Key", "<apiKey of a target>")
+    contentType(ContentType.Application.Json)
+    setBody("""{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}""")
+}
+```
+
 ### `GET /health`
 
 No authentication. Answers `200 ok` as long as the process runs — intended for monitoring.
@@ -157,8 +165,9 @@ The first rejection of a target is logged; the following ones are not, so an att
 
 Like every other mail, system mails carry the default target's prefixes.
 
-**Logging.** Everything goes to stdout/stderr (Klogger), which systemd forwards to the journal. Neither API
-keys nor SMTP passwords are ever logged.
+**Logging.** Everything goes to stdout/stderr (Klogger), which systemd forwards to the journal. A rejected API
+key is logged with the client address (`X-Forwarded-For` when the proxy sets it). Neither API keys nor SMTP
+passwords are ever logged.
 
 ## Deployment
 
@@ -177,17 +186,6 @@ The unit waits for `network-online.target` so the startup mail can be delivered,
 after `systemctl stop` as success, and restarts KNot on failure — but not after exit code 78 (rejected config
 or a port that cannot be bound): fix the cause, then `systemctl restart knot.service`. Put a reverse proxy in
 front for TLS.
-
-### Minimal call from a Kotlin service with the [Ktor client](https://ktor.io/docs/client-requests.html) 
-(any engine, no content negotiation needed):
-
-```kotlin
-val response = client.post("https://knot.example.com/hook") {
-    header("X-API-Key", "<apiKey of a target>")
-    contentType(ContentType.Application.Json)
-    setBody("""{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}""")
-}
-```
 
 ## Not in scope (deliberately)
 

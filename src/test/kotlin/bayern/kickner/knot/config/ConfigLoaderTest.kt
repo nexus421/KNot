@@ -1,5 +1,6 @@
 package bayern.kickner.knot.config
 
+import bayern.kickner.knot.cli.generateApiKey
 import kotnexlib.ResultOf2
 import java.io.File
 import kotlin.test.Test
@@ -93,6 +94,13 @@ class ConfigLoaderTest {
         val result = load(config(targets = listOf(target(name = "grafana", apiKey = "ops-key-0123456789"))))
 
         assertContains(assertIs<ResultOf2.Failure<String>>(result).value, "apiKey")
+    }
+
+    @Test
+    fun `a generated api key passes validation`() {
+        val result = load(config(default = target(apiKey = generateApiKey())))
+
+        assertIs<ResultOf2.Success<AppConfig>>(result)
     }
 
     @Test
