@@ -15,7 +15,7 @@ import java.security.MessageDigest
  * episode when a target reaches its rate limit.
  * @property rateLimitPerMinute Maximum number of hook requests per target and minute.
  * @property allowApiKeyInQuery Additionally accepts the API key as `?apiKey=` query parameter.
- * @property defaultTarget Mandatory target; receives the system mails and is usable as a regular webhook target.
+ * @property defaultTarget Mandatory target. Receives the system mails and is usable as a regular webhook target.
  * @property targets Additional webhook targets.
  */
 @Serializable
@@ -66,7 +66,7 @@ data class Target(
 }
 
 /**
- * SMTP account. Every field is required; the server certificate is verified whenever TLS is used.
+ * SMTP account. Every field is required. The server certificate is verified whenever TLS is used.
  */
 @Serializable
 data class SmtpConfig(
@@ -86,12 +86,12 @@ data class SmtpConfig(
 /** Transport encryption of an SMTP connection. */
 @Serializable
 enum class TlsMode {
-    /** STARTTLS is required; the connection fails if the server does not offer it (typically port 587). */
+    /** STARTTLS is required. The connection fails if the server does not offer it (typically port 587). */
     @SerialName("starttls") STARTTLS,
 
     /** Implicit TLS from the first byte (typically port 465). */
     @SerialName("ssl") SSL,
 
-    /** No encryption — credentials travel in plaintext. Only for trusted internal relays. */
+    /** No encryption, credentials travel in plaintext. Only for trusted internal relays. */
     @SerialName("none") NONE
 }

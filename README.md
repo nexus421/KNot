@@ -10,33 +10,47 @@ only on `127.0.0.1`.
 
 ## Quick start
 
-Requirements: JDK 25 to build (Amazon Corretto is the pinned toolchain; the wrapper downloads it if missing) and a
+Requirements: JDK 25 to build (Amazon Corretto is the pinned toolchain; Gradle downloads it if missing) and a
 Java 25 runtime on the machine that runs `knot.jar`.
 
 ```bash
 cp config.example.json config.json   # then fill in API keys, recipients and SMTP accounts
 ./gradlew run                        # development: reads ./config.json
 ./gradlew buildFatJar                # production: build/libs/knot.jar
-java -jar build/libs/knot.jar config=/opt/knot/config.json
+java -jar build/libs/knot.jar config=/path/to/config.json
 ```
 
-Then:
+### Command line
+
+| Argument        | Default       | Description                                                                   |
+|-----------------|---------------|-------------------------------------------------------------------------------|
+| `config=<path>` | `config.json` | Config file to load (see Configuration).                                      |
+| `key`           | —             | Prints a fresh API key for a target and exits; needs no config file. Only the key goes to stdout, the hint to stderr, so `KEY=$(java -jar knot.jar key)` captures just the key. |
+| `test=<name>`   | —             | Sends one test mail through the target named `<name>` and exits. No server. The config is loaded and validated like on a normal start. The mail carries the target's prefixes, so they are checked as well. |
+
+Without `key` or `test=`, KNot starts the server. Exit codes:
+
+| Code  | Meaning                                                                                        |
+|-------|------------------------------------------------------------------------------------------------|
+| `0`   | `key` printed, or the test mail was delivered.                                                 |
+| `1`   | `test=`: the target is unknown, or the delivery failed after all retries — the log says why.   |
+| `78`  | The config file was rejected, or (server) the address could not be bound. See Deployment.      |
+| `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.            |
+
+Examples:
+
+```bash
+java -jar build/libs/knot.jar key
+java -jar build/libs/knot.jar test=ops config=/root/knot/config.json
+```
+
+With the server running, send a hook:
 
 ```bash
 curl -X POST http://127.0.0.1:8080/hook \
   -H "X-API-Key: <apiKey of a target>" \
   -H "Content-Type: application/json" \
   -d '{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}'
-```
-Minimal call from a Kotlin service with the [Ktor client](https://ktor.io/docs/client-requests.html) (any
-engine, no content negotiation needed):
-
-```kotlin
-val response = client.post("https://knot.example.com/hook") {
-    header("X-API-Key", "<apiKey of a target>")
-    contentType(ContentType.Application.Json)
-    setBody("""{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}""")
-}
 ```
 
 Tests: `./gradlew test` — GitHub Actions runs them on every push (`.github/workflows/test.yml`).
@@ -56,7 +70,7 @@ typo cannot silently fall back to a default.
 | `listenPort`              | Int            | `8080`        | Port to listen on.                                                          |
 | `sendSystemMails`         | Boolean        | `true`        | Send system mails through `default`: KNot started/stopped, rate limit reached. |
 | `rateLimitPerMinute`      | Int            | `10`          | Maximum hook requests per target and minute.                                |
-| `allowApiKeyInQuery`      | Boolean        | `false`       | Additionally accept the API key as `?apiKey=` query parameter. Only for senders that cannot set headers: the key then may shows up in the reverse proxy's access log. |
+| `allowApiKeyInQuery`      | Boolean        | `false`       | Additionally accept the API key as `?apiKey=` query parameter. Only for senders that cannot set headers: the key then may show up in the reverse proxy's access log. |
 | `default`                 | Target         | required      | Receives the system mails; usable as a regular webhook target as well.      |
 | `targets`                 | List\<Target\> | `[]`          | Further webhook targets.                                                    |
 
@@ -78,7 +92,7 @@ A `Target`:
 | `smtp.tls`      | String | `"starttls"` | `"starttls"` (required, not optional), `"ssl"` (implicit TLS) or `"none"` (plaintext — internal relays only). |
 
 The server certificate is always verified when TLS is used. See [config.example.json](config.example.json)
-for a complete example. Generate API keys with something like `openssl rand -base64 32`.
+for a complete example. Generate API keys with `java -jar knot.jar key`.
 
 ## Endpoints
 
@@ -129,11 +143,12 @@ The first rejection of a target is logged; the following ones are not, so an att
 
 **System mails.** Unless `sendSystemMails` is `false`, `default` receives:
 
-- `KNot started` (host, time, version) when KNot starts up. Best effort — a failure is logged and the
-  service keeps running.
-- `KNot stopped` (host, time) on shutdown, sent from a JVM shutdown hook; the process ends once the delivery
-  attempt is over. The mail therefore only exists for an orderly stop (`systemctl stop`, SIGTERM, Ctrl+C),
-  not after a crash or `kill -9`.
+- `KNot started` (host, time, version) when KNot starts up. It is sent before the port is bound, so a start
+  that fails because the port is taken still sends it. Best effort — a failure is logged and the service keeps
+  running.
+- `KNot stopped` (host, time) from a JVM shutdown hook, i.e. on every orderly end of the process:
+  `systemctl stop`, SIGTERM, Ctrl+C, and also the exit with code 78 after a taken port — but not after a crash
+  or `kill -9`. The process ends once the delivery attempt is over.
 - `KNot rate limit reached: <target>` when a target starts exceeding its rate limit — once per episode, not
   per rejected request: while the target keeps exceeding the limit minute after minute, no further mail is
   sent. The report is re-armed after a full minute within the limit (or without any requests), so the next
@@ -147,24 +162,30 @@ keys nor SMTP passwords are ever logged.
 
 ## Deployment
 
+[knot.service](knot.service) runs KNot as root from `/root/knot` with `/usr/bin/java`. As root on the target
+machine:
+
 ```bash
-./gradlew buildFatJar            # -> build/libs/knot.jar
-sudo useradd --system --home /opt/knot --shell /usr/sbin/nologin knot
-sudo mkdir -p /opt/knot && sudo cp build/libs/knot.jar /opt/knot/
-sudo cp config.example.json /opt/knot/config.json   # edit it, then:
-sudo chown -R knot:knot /opt/knot && sudo chmod 600 /opt/knot/config.json
-sudo cp knot.service /etc/systemd/system/knot.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now knot.service
+./gradlew buildFatJar                                      # -> build/libs/knot.jar
+mkdir -p /root/knot && cp build/libs/knot.jar /root/knot/
+# /root/knot/config.json must exist (see Configuration) — chmod 600 it, it holds SMTP passwords
+# copy knot.service to /etc/systemd/system/ and adjust paths, java binary or User there if your setup differs
+systemctl daemon-reload && systemctl enable --now knot.service
 ```
 
-[knot.service](knot.service) restarts KNot on failure, but not after exit code 78 (rejected config or a port
-that cannot be bound) — fix the cause and run `sudo systemctl restart knot.service`. Put a reverse proxy in
-front for TLS, e.g. Caddy:
+The unit waits for `network-online.target` so the startup mail can be delivered, treats the JVM's exit code 143
+after `systemctl stop` as success, and restarts KNot on failure — but not after exit code 78 (rejected config
+or a port that cannot be bound): fix the cause, then `systemctl restart knot.service`. Put a reverse proxy in
+front for TLS.
 
-```
-knot.example.com {
-    reverse_proxy 127.0.0.1:8080
+### Minimal call from a Kotlin service with the [Ktor client](https://ktor.io/docs/client-requests.html) 
+(any engine, no content negotiation needed):
+
+```kotlin
+val response = client.post("https://knot.example.com/hook") {
+    header("X-API-Key", "<apiKey of a target>")
+    contentType(ContentType.Application.Json)
+    setBody("""{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}""")
 }
 ```
 

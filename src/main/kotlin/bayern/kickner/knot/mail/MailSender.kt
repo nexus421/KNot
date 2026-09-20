@@ -24,13 +24,13 @@ import kotlin.time.Duration.Companion.seconds
 private const val CONNECT_TIMEOUT_MS = 5_000
 private const val IO_TIMEOUT_MS = 10_000
 
-/** Pauses before the second and third attempt; a hanging SMTP server is bounded by the timeouts above. */
+/** Pauses before the second and third attempt. A hanging SMTP server is bounded by the timeouts above. */
 private val defaultRetryDelays = listOf(1.seconds, 3.seconds)
 
 /**
  * Sends mails over SMTP via Jakarta Mail, retrying transient failures.
  *
- * @param transport Delivers a message; defaults to [Transport.send]. Injectable so tests need no SMTP server.
+ * @param transport Delivers a message, defaults to [Transport.send]. Injectable so tests need no SMTP server.
  * @param retryDelays Pause before each retry. The number of attempts is one more than the number of delays.
  */
 class MailSender(
@@ -41,8 +41,8 @@ class MailSender(
     private val maxAttempts = retryDelays.size + 1
 
     /**
-     * Sends [content] to [target] synchronously, on [Dispatchers.IO]. Every attempt is logged on failure;
-     * the returned failure names the target and the last error, never credentials. Rejected credentials are
+     * Sends [content] to [target] synchronously, on [Dispatchers.IO]. Every attempt is logged on failure.
+     * The returned failure names the target and the last error, never credentials. Rejected credentials are
      * not retried: they cannot fix themselves, and repeated failed logins get accounts locked.
      */
     suspend fun send(target: Target, content: MailContent): ResultOf<Unit> {

@@ -5,7 +5,7 @@ import kotlinx.serialization.json.Json
 import kotnexlib.ResultOf2
 import java.io.File
 
-/** Shorter keys are trivially brute-forced; the key is the only authentication KNot has. */
+/** Shorter keys are trivially brute-forced. The key is the only authentication KNot has. */
 private const val MIN_API_KEY_LENGTH = 16
 
 /**
@@ -78,5 +78,5 @@ private fun validateTarget(owner: String, target: Target): List<String> {
 
 private fun Int.isValidPort() = this in 1..65535
 
-/** Jakarta Mail is the authority on address syntax; a strict parse also rejects address lists. */
+/** Jakarta Mail is the authority on address syntax. A strict parse also rejects address lists. */
 private fun String.isValidAddress() = runCatching { InternetAddress(this, true).validate() }.isSuccess

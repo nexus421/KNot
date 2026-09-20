@@ -57,7 +57,7 @@ internal class RecordingTransport(
         sent += message
     }
 
-    /** Waits up to three seconds for [count] recorded mails; asynchronous senders need this. */
+    /** Waits up to three seconds for [count] recorded mails. Asynchronous senders need this. */
     fun awaitMails(count: Int) {
         val deadline = System.currentTimeMillis() + 3_000
         while (sent.size < count && System.currentTimeMillis() < deadline) Thread.sleep(20)

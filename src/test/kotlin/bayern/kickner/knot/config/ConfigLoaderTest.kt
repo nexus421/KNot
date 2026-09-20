@@ -46,7 +46,11 @@ class ConfigLoaderTest {
 
     @Test
     fun `unreadable file is reported as such`() {
-        val directory = File.createTempFile("knot-config", "").apply { delete(); mkdir(); deleteOnExit() }
+        val directory = File.createTempFile("knot-config", "").apply {
+            delete()
+            mkdir()
+            deleteOnExit()
+        }
 
         val result = loadConfig(directory.absolutePath)
 

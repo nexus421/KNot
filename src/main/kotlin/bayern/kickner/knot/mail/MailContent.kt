@@ -13,8 +13,8 @@ private val lineBreaks = Regex("[\r\n]+")
 data class MailContent(val subject: String, val body: String)
 
 /**
- * Frames [subject] and [body] with this target's prefixes and postfix. Nothing is inserted between the parts;
- * a wanted space or line break has to be part of the configured prefix/postfix.
+ * Frames [subject] and [body] with this target's prefixes and postfix. Nothing is inserted between the parts.
+ * A wanted space or line break has to be part of the configured prefix/postfix.
  *
  * A blank [subject] falls back to [DEFAULT_SUBJECT]. Line breaks in the subject are collapsed to a space,
  * so a caller can never smuggle additional mail headers in through it.

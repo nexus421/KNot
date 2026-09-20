@@ -63,12 +63,12 @@ class MailSenderTest {
     @Test
     fun `message carries sender recipient subject and utf-8 text`() {
         val target = testTarget(to = "alerts@example.com", smtp = testSmtp(from = "knot@example.com"))
-        val message = buildMessage(Session.getInstance(Properties()), target, MailContent("Crème brûlée – Ærø", "Ça va?"))
+        val message = buildMessage(Session.getInstance(Properties()), target, MailContent("Crème brûlée à Ærø", "Ça va?"))
         message.saveChanges()
 
         assertEquals("knot@example.com", message.from.single().toString())
         assertEquals("alerts@example.com", message.getRecipients(Message.RecipientType.TO).single().toString())
-        assertEquals("Crème brûlée – Ærø", message.subject)
+        assertEquals("Crème brûlée à Ærø", message.subject)
         assertContains(message.getHeader("Subject").single(), "=?UTF-8?")
         assertContains(message.getHeader("Content-Type").single(), "charset=UTF-8")
         assertEquals("Ça va?", message.content)

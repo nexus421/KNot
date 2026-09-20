@@ -14,15 +14,15 @@ import java.time.format.DateTimeFormatter
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-private val timestampFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
+internal val timestampFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
 
 /**
- * Sends the optional system mails — KNot started/stopped, a target reached its rate limit — always through the
+ * Sends the optional system mails (KNot started/stopped, a target reached its rate limit), always through the
  * default target. Every mail is best effort: a failure is logged and nothing else happens.
  *
  * @param version Application version shown in the startup mail.
  * @param hostname Name of the machine KNot runs on.
- * @param now Current time; injectable for tests.
+ * @param now Current time, injectable for tests.
  */
 class SystemNotifier(
     private val target: Target,
@@ -38,7 +38,7 @@ class SystemNotifier(
 
     /**
      * Reports that [reachedBy] exceeded its limit. The caller decides when this is worth a mail (once per
-     * episode, see [bayern.kickner.knot.ratelimit.RateLimiter]); the key itself is never part of the mail.
+     * episode, see [bayern.kickner.knot.ratelimit.RateLimiter]). The key itself is never part of the mail.
      */
     suspend fun notifyRateLimitReached(reachedBy: Target, limitPerMinute: Int) {
         val body = "Target '${reachedBy.name}' has reached its rate limit of $limitPerMinute requests per minute. " +
@@ -51,7 +51,7 @@ class SystemNotifier(
     /**
      * Sends the stop mail and blocks until the delivery attempt is over. Meant for the JVM shutdown hook, where
      * the process ends as soon as this returns. [timeout] cancels the coroutine, but an SMTP call already in
-     * progress is not interrupted — the wait is ultimately bounded by the SMTP timeouts, not by [timeout].
+     * progress is not interrupted. The wait is ultimately bounded by the SMTP timeouts, not by [timeout].
      */
     fun notifyStopped(timeout: Duration = 5.seconds) {
         val body = "KNot has stopped.\n\n${footer()}"
@@ -72,4 +72,4 @@ class SystemNotifier(
     private fun footer(): String = "Host: $hostname\nTime: ${now().format(timestampFormat)}"
 }
 
-private fun localHostname(): String = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("unknown")
+internal fun localHostname(): String = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("unknown")

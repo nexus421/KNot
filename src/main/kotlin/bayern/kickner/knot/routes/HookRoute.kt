@@ -28,7 +28,7 @@ private const val API_KEY_QUERY_PARAMETER = "apiKey"
 /**
  * JSON payload of a hook request. Everything else in the document is ignored.
  *
- * @property subject Optional mail subject; blank falls back to the fixed default.
+ * @property subject Optional mail subject, blank falls back to the fixed default.
  * @property body Required plain-text mail body.
  */
 @Serializable
@@ -37,11 +37,11 @@ data class HookPayload(val subject: String? = null, val body: String? = null)
 private val payloadJson = Json { ignoreUnknownKeys = true }
 
 /**
- * `POST /hook` — authenticates the caller by API key, applies the per-target rate limit, then sends the
+ * `POST /hook`: authenticates the caller by API key, applies the per-target rate limit, then sends the
  * framed payload as a mail. Failures map to 401 (no or unknown key), 429 (rate limit), 400 (payload)
  * and 502 (delivery failed after all retries).
  *
- * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode; that
+ * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode. That
  * mail is sent in the background so the 429 does not wait for SMTP.
  */
 fun Route.hookRoute(
@@ -64,7 +64,7 @@ fun Route.hookRoute(
             Verdict.ALLOWED -> Unit
             Verdict.LIMIT_REACHED, Verdict.REJECTED -> {
                 if (result == Verdict.LIMIT_REACHED) {
-                    // Logged and mailed once per episode; the following rejections stay quiet so an attack cannot flood the journal
+                    // Logged and mailed once per episode, the following rejections stay quiet so an attack cannot flood the journal
                     staticLog(KLogger.Level.WARN, TAG) {
                         "Rate limit of ${config.rateLimitPerMinute}/min reached for target '${target.name}', rejecting further requests"
                     }
@@ -93,7 +93,7 @@ fun Route.hookRoute(
     }
 }
 
-/** Behind the reverse proxy the connection peer is always the proxy; its forwarded header names the real client. */
+/** Behind the reverse proxy the connection peer is always the proxy. Its forwarded header names the real client. */
 private fun RoutingCall.clientAddress(): String = request.header("X-Forwarded-For") ?: request.origin.remoteHost
 
 /** The presented API key: the header wins, the query parameter only counts when enabled. Blank values count as absent. */

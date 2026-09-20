@@ -7,13 +7,13 @@ private val WINDOW_MILLIS = 60.seconds.inWholeMilliseconds
 /**
  * In-memory fixed-window rate limiter: at most [limitPerMinute] acquisitions per key within a minute.
  * The window of a key starts with its first request and is replaced by a fresh one once it has expired.
- * State lives only in memory — a restart starts over, which is fine for its purpose (damping a leaked key).
+ * State lives only in memory. A restart starts over, which is fine for its purpose (damping a leaked key).
  *
  * Besides allowing or rejecting, the limiter tells when a key *starts* exceeding its limit ([Verdict.LIMIT_REACHED]),
  * so that a single notification can be sent per episode: a key that keeps exceeding the limit minute after minute
- * is reported once; the report is re-armed after a full minute within the limit or without any requests.
+ * is reported once. The report is re-armed after a full minute within the limit or without any requests.
  *
- * @param clock Current time in epoch milliseconds; injectable for tests.
+ * @param clock Current time in epoch milliseconds, injectable for tests.
  */
 class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long = System::currentTimeMillis) {
 
@@ -21,10 +21,10 @@ class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long
         /** Within the limit. */
         ALLOWED,
 
-        /** Over the limit, and the first rejection since the key was last within it — worth a notification. */
+        /** Over the limit, and the first rejection since the key was last within it. Worth a notification. */
         LIMIT_REACHED,
 
-        /** Over the limit; the episode was already reported. */
+        /** Over the limit, the episode was already reported. */
         REJECTED
     }
 

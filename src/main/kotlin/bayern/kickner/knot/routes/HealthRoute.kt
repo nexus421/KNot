@@ -5,8 +5,8 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 
 /**
- * `GET /health` — unauthenticated liveness check for monitoring. Answers `ok` as long as the process runs;
- * a config that failed to load never gets this far, because KNot exits at startup instead.
+ * `GET /health`: unauthenticated liveness check for monitoring. Answers `ok` as long as the process runs.
+ * A config that failed to load never gets this far, because KNot exits at startup instead.
  */
 fun Route.healthRoute() {
     get("/health") {
