@@ -10,7 +10,6 @@ import bayern.kickner.knot.ratelimit.RateLimiter
 import bayern.kickner.knot.routes.healthRoute
 import bayern.kickner.knot.routes.hookRoute
 import io.ktor.server.application.Application
-import io.ktor.server.application.ServerReady
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
@@ -21,7 +20,6 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotnexlib.ArgsInterpreter
@@ -78,15 +76,13 @@ fun main(args: Array<String>) {
 }
 
 /**
- * Builds the HTTP server. Banner, startup mail and the shutdown hook (stop the server, then send the stop mail)
- * are wired to [ServerReady], so a start that fails — typically a taken port — never produces a misleading stop
- * mail. The hook registration is injectable so tests can run the hook themselves.
+ * Builds the HTTP server: logs the banner, sends the startup mail in the background and registers the JVM
+ * shutdown hook that sends the stop mail. Ktor's own shutdown hook stops the engine.
  */
 fun knotServer(
     config: AppConfig,
     mailSender: MailSender,
-    notifier: SystemNotifier?,
-    registerShutdownHook: (() -> Unit) -> Unit = { hook -> Runtime.getRuntime().addShutdownHook(Thread(hook)) }
+    notifier: SystemNotifier?
 ): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
     staticLog(KLogger.Level.INFO, TAG) {
         "KNot $appVersion listening on ${config.listenHost}:${config.listenPort} with ${config.allTargets.size} target(s): ${config.allTargets.joinToString { it.name }}"

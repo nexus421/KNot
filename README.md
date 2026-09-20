@@ -5,7 +5,7 @@ as a plain-text e-mail over SMTP. It exists for services that can call a webhook
 themselves — Grafana alerts, CI/CD pipelines, uptime checks, small internal tools.
 
 KISS by design: no UI, no database, no runtime configuration. One JSON config file, one fat JAR, one systemd
-service. TLS termination is left to a reverse proxy (e.g. Caddy); KNot itself listens on plain HTTP, by default
+service. TLS termination is left to a reverse proxy (e.g. Caddy, Zoraxy); KNot itself listens on plain HTTP, by default
 only on `127.0.0.1`.
 
 ## Quick start
@@ -28,8 +28,18 @@ curl -X POST http://127.0.0.1:8080/hook \
   -H "Content-Type: application/json" \
   -d '{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}'
 ```
+Minimal call from a Kotlin service with the [Ktor client](https://ktor.io/docs/client-requests.html) (any
+engine, no content negotiation needed):
 
-Tests: `./gradlew test`
+```kotlin
+val response = client.post("https://knot.example.com/hook") {
+    header("X-API-Key", "<apiKey of a target>")
+    contentType(ContentType.Application.Json)
+    setBody("""{"subject": "HighCPU firing", "body": "CPU > 90% for 5 minutes"}""")
+}
+```
+
+Tests: `./gradlew test` — GitHub Actions runs them on every push (`.github/workflows/test.yml`).
 
 ## Configuration
 
@@ -44,9 +54,9 @@ typo cannot silently fall back to a default.
 |---------------------------|----------------|---------------|-----------------------------------------------------------------------------|
 | `listenHost`              | String         | `"127.0.0.1"` | Interface to bind to. Use `"0.0.0.0"` only if the reverse proxy runs elsewhere. |
 | `listenPort`              | Int            | `8080`        | Port to listen on.                                                          |
-| `sendSystemMails`         | Boolean        | `false`       | Send system mails through `default`: KNot started/stopped, rate limit reached. |
+| `sendSystemMails`         | Boolean        | `true`        | Send system mails through `default`: KNot started/stopped, rate limit reached. |
 | `rateLimitPerMinute`      | Int            | `10`          | Maximum hook requests per target and minute.                                |
-| `allowApiKeyInQuery`      | Boolean        | `false`       | Additionally accept the API key as `?apiKey=` query parameter. Only for senders that cannot set headers: the key then shows up in the reverse proxy's access log. |
+| `allowApiKeyInQuery`      | Boolean        | `false`       | Additionally accept the API key as `?apiKey=` query parameter. Only for senders that cannot set headers: the key then may shows up in the reverse proxy's access log. |
 | `default`                 | Target         | required      | Receives the system mails; usable as a regular webhook target as well.      |
 | `targets`                 | List\<Target\> | `[]`          | Further webhook targets.                                                    |
 
@@ -117,12 +127,13 @@ window. Requests beyond `rateLimitPerMinute` are answered with `429` without sen
 the counters, which is harmless. This limits the damage of a leaked key; it is not an anti-DoS measure.
 The first rejection of a target is logged; the following ones are not, so an attack cannot flood the journal.
 
-**System mails.** With `sendSystemMails: true`, `default` receives:
+**System mails.** Unless `sendSystemMails` is `false`, `default` receives:
 
-- `KNot started` (host, time, version) once the server accepts connections. Best effort — a failure is
-  logged and the service keeps running.
-- `KNot stopped` (host, time) on shutdown, sent from a JVM shutdown hook with at most 5 seconds. It therefore
-  only exists for an orderly stop (`systemctl stop`, SIGTERM, Ctrl+C), not after a crash or `kill -9`.
+- `KNot started` (host, time, version) when KNot starts up. Best effort — a failure is logged and the
+  service keeps running.
+- `KNot stopped` (host, time) on shutdown, sent from a JVM shutdown hook; the process ends once the delivery
+  attempt is over. The mail therefore only exists for an orderly stop (`systemctl stop`, SIGTERM, Ctrl+C),
+  not after a crash or `kill -9`.
 - `KNot rate limit reached: <target>` when a target starts exceeding its rate limit — once per episode, not
   per rejected request: while the target keeps exceeding the limit minute after minute, no further mail is
   sent. The report is re-armed after a full minute within the limit (or without any requests), so the next

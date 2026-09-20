@@ -1,5 +1,6 @@
 package bayern.kickner.knot.config
 
+import bayern.kickner.knot.mail.smtpProperties
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
@@ -21,7 +22,7 @@ import java.security.MessageDigest
 data class AppConfig(
     val listenHost: String = "127.0.0.1",
     val listenPort: Int = 8080,
-    val sendSystemMails: Boolean = false,
+    val sendSystemMails: Boolean = true,
     val rateLimitPerMinute: Int = 10,
     val allowApiKeyInQuery: Boolean = false,
     @SerialName("default") val defaultTarget: Target,
@@ -77,6 +78,9 @@ data class SmtpConfig(
     val tls: TlsMode = TlsMode.STARTTLS
 ) {
     override fun toString() = "SmtpConfig(host='$host', port=$port, username='$username', from='$from', tls=$tls)"
+
+    /** Jakarta Mail session properties for this account, built once on first use and shared by every mail sent with it. */
+    val properties by lazy { smtpProperties(this) }
 }
 
 /** Transport encryption of an SMTP connection. */

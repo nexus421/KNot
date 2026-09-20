@@ -44,37 +44,50 @@ private val payloadJson = Json { ignoreUnknownKeys = true }
  * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode; that
  * mail is sent in the background so the 429 does not wait for SMTP.
  */
-fun Route.hookRoute(config: AppConfig, mailSender: MailSender, rateLimiter: RateLimiter, systemNotifier: SystemNotifier?) {
+fun Route.hookRoute(
+    config: AppConfig,
+    mailSender: MailSender,
+    rateLimiter: RateLimiter,
+    systemNotifier: SystemNotifier?
+) {
     post("/hook") {
         val target = call.apiKey(config.allowApiKeyInQuery)?.let { config.targetForApiKey(it) }
         if (target == null) {
-            staticLog(KLogger.Level.WARN, TAG) { "Rejected hook request from ${call.clientAddress()}: missing or unknown API key" }
+            staticLog(
+                KLogger.Level.WARN,
+                TAG
+            ) { "Rejected hook request from ${call.clientAddress()}: missing or unknown API key" }
             return@post call.respond(HttpStatusCode.Unauthorized, "Missing or invalid API key")
         }
 
-        when (rateLimiter.tryAcquire(target.apiKey)) {
+        when (val result = rateLimiter.tryAcquire(target.apiKey)) {
             Verdict.ALLOWED -> Unit
-            Verdict.LIMIT_REACHED -> {
-                // Logged and mailed once per episode; the following rejections stay quiet so an attack cannot flood the journal
-                staticLog(KLogger.Level.WARN, TAG) { "Rate limit of ${config.rateLimitPerMinute}/min reached for target '${target.name}', rejecting further requests" }
-                if (systemNotifier != null) call.application.launch { systemNotifier.notifyRateLimitReached(target, config.rateLimitPerMinute) }
+            Verdict.LIMIT_REACHED, Verdict.REJECTED -> {
+                if (result == Verdict.LIMIT_REACHED) {
+                    // Logged and mailed once per episode; the following rejections stay quiet so an attack cannot flood the journal
+                    staticLog(KLogger.Level.WARN, TAG) {
+                        "Rate limit of ${config.rateLimitPerMinute}/min reached for target '${target.name}', rejecting further requests"
+                    }
+                    if (systemNotifier != null) call.application.launch {
+                        systemNotifier.notifyRateLimitReached(target, config.rateLimitPerMinute)
+                    }
+                }
                 return@post call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded")
             }
-            Verdict.REJECTED -> return@post call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded")
         }
 
         // receiveText stays outside runCatching: an oversized body throws PayloadTooLargeException, which Ktor answers with 413
         val text = call.receiveText()
         val payload = runCatching { payloadJson.decodeFromString<HookPayload>(text) }
             .getOrElse { return@post call.respond(HttpStatusCode.BadRequest, "Invalid JSON payload") }
-        val body = payload.body
-        if (body.isNullOrBlank()) return@post call.respond(HttpStatusCode.BadRequest, "Field 'body' must not be empty")
+        if (payload.body.isNullOrBlank()) return@post call.respond(HttpStatusCode.BadRequest, "Field 'body' must not be empty")
 
-        when (mailSender.send(target, target.compose(payload.subject, body))) {
+        when (mailSender.send(target, target.compose(payload.subject, payload.body))) {
             is ResultOf.Success -> {
                 staticLog(KLogger.Level.INFO, TAG) { "Mail sent for target '${target.name}'" }
                 call.respond(HttpStatusCode.OK, "ok")
             }
+
             is ResultOf.Failure -> call.respond(HttpStatusCode.BadGateway, "Mail delivery failed")
         }
     }
@@ -86,6 +99,6 @@ private fun RoutingCall.clientAddress(): String = request.header("X-Forwarded-Fo
 /** The presented API key: the header wins, the query parameter only counts when enabled. Blank values count as absent. */
 private fun RoutingCall.apiKey(allowQueryParameter: Boolean): String? {
     val fromHeader = request.header(API_KEY_HEADER)?.takeUnless { it.isBlank() }
-    val fromQuery = request.queryParameters[API_KEY_QUERY_PARAMETER]?.takeUnless { it.isBlank() }
-    return fromHeader ?: fromQuery.takeIf { allowQueryParameter }
+    return fromHeader
+        ?: if (allowQueryParameter) request.queryParameters[API_KEY_QUERY_PARAMETER]?.takeUnless { it.isBlank() } else null
 }

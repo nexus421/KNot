@@ -46,7 +46,7 @@ class MailSender(
      * not retried: they cannot fix themselves, and repeated failed logins get accounts locked.
      */
     suspend fun send(target: Target, content: MailContent): ResultOf<Unit> {
-        val session = Session.getInstance(smtpProperties(target.smtp), target.smtp.authenticator())
+        val session = Session.getInstance(target.smtp.properties, target.smtp.authenticator())
         val message = buildMessage(session, target, content)
 
         var lastError: Throwable? = null

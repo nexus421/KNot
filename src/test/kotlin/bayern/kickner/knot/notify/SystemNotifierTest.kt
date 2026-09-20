@@ -12,8 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.measureTime
 
 private val fixedTime = ZonedDateTime.of(2026, 9, 19, 18, 40, 12, 0, ZoneId.of("Europe/Berlin"))
 
@@ -79,14 +77,5 @@ class SystemNotifierTest {
         val body = mail.content as String
         assertContains(body, "node-1")
         assertContains(body, "2026-09-19 18:40:12")
-    }
-
-    @Test
-    fun `shutdown gives up once the timeout is reached`() {
-        val stuck = notifier { Thread.sleep(5_000) }
-
-        val elapsed = measureTime { stuck.notifyStopped(timeout = 200.milliseconds) }
-
-        assertTrue(elapsed < 2_000.milliseconds, "notifyStopped blocked for $elapsed")
     }
 }

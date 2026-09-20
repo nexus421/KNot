@@ -3,12 +3,10 @@ package bayern.kickner.knot.notify
 import bayern.kickner.klogger.infoLog
 import bayern.kickner.klogger.warnLog
 import bayern.kickner.knot.config.Target
-import bayern.kickner.knot.globalScope
 import bayern.kickner.knot.mail.MailSender
 import bayern.kickner.knot.mail.compose
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotnexlib.ResultOf
 import java.net.InetAddress
 import java.time.ZonedDateTime
@@ -51,18 +49,17 @@ class SystemNotifier(
     }
 
     /**
-     * Sends the stop mail and blocks until it is delivered or [timeout] has passed. Meant for the JVM shutdown
-     * hook, where the process ends as soon as this returns — a slow SMTP server must not delay that for long.
+     * Sends the stop mail and blocks until the delivery attempt is over. Meant for the JVM shutdown hook, where
+     * the process ends as soon as this returns. [timeout] cancels the coroutine, but an SMTP call already in
+     * progress is not interrupted — the wait is ultimately bounded by the SMTP timeouts, not by [timeout].
      */
     fun notifyStopped(timeout: Duration = 5.seconds) {
         val body = "KNot has stopped.\n\n${footer()}"
-        val job = globalScope.launch {
-            withTimeout(timeout) {
+        runBlocking {
+            withTimeoutOrNull(timeout) {
                 send("KNot stopped", body)
             }
         }
-
-        runBlocking { job.join() }
     }
 
     private suspend fun send(subject: String, body: String) {

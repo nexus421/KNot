@@ -1,6 +1,8 @@
 package bayern.kickner.knot.ratelimit
 
-private const val WINDOW_MILLIS = 60_000L
+import kotlin.time.Duration.Companion.seconds
+
+private val WINDOW_MILLIS = 60.seconds.inWholeMilliseconds
 
 /**
  * In-memory fixed-window rate limiter: at most [limitPerMinute] acquisitions per key within a minute.
@@ -26,11 +28,9 @@ class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long
         REJECTED
     }
 
-    private class Window(val startedAt: Long) {
+    private class State(var startedAt: Long) {
         var count = 0
-    }
 
-    private class State(var window: Window) {
         /** True once LIMIT_REACHED was reported and no calm minute has passed since. */
         var reported = false
     }
@@ -43,19 +43,20 @@ class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long
     @Synchronized
     fun tryAcquire(key: String): Verdict {
         val now = clock()
-        val state = states.getOrPut(key) { State(Window(now)) }
+        val state = states.getOrPut(key) { State(now) }
 
-        val expired = now - state.window.startedAt >= WINDOW_MILLIS
+        val expired = (now - state.startedAt) >= WINDOW_MILLIS
         if (expired) {
             // A minute within the limit, or one without any request at all, ends the reported episode
-            val calm = state.window.count <= limitPerMinute || now - state.window.startedAt >= 2 * WINDOW_MILLIS
+            val calm = state.count <= limitPerMinute || now - state.startedAt >= 2 * WINDOW_MILLIS
             if (calm) state.reported = false
-            state.window = Window(now)
+            state.startedAt = now
+            state.count = 0
         }
 
-        state.window.count++
+        state.count++
         return when {
-            state.window.count <= limitPerMinute -> Verdict.ALLOWED
+            state.count <= limitPerMinute -> Verdict.ALLOWED
             state.reported -> Verdict.REJECTED
             else -> {
                 state.reported = true

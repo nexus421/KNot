@@ -7,6 +7,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ConfigLoaderTest {
 
@@ -19,7 +20,7 @@ class ConfigLoaderTest {
         assertEquals(8080, config.listenPort)
         assertEquals(10, config.rateLimitPerMinute)
         assertFalse(config.allowApiKeyInQuery)
-        assertFalse(config.sendSystemMails)
+        assertTrue(config.sendSystemMails)
         assertEquals("ops", config.defaultTarget.name)
         assertEquals(TlsMode.STARTTLS, config.defaultTarget.smtp.tls)
         assertEquals("grafana", config.targets.single().name)
