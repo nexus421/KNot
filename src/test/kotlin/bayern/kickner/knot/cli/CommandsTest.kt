@@ -9,12 +9,7 @@ import kotlinx.coroutines.runBlocking
 import kotnexlib.ResultOf
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 private val fixedTime = ZonedDateTime.of(2026, 9, 19, 18, 40, 12, 0, ZoneId.of("Europe/Berlin"))
 
@@ -56,7 +51,7 @@ class CommandsTest {
         assertContains(body, "grafana")
         assertContains(body, "1.2.3")
         assertContains(body, "node-1")
-        assertContains(body, "2026-09-19 18:40:12")
+        assertContains(body, "19.09.2026 18:40:12 CEST")
     }
 
     @Test

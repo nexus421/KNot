@@ -11,10 +11,11 @@ import kotnexlib.ResultOf
 import java.net.InetAddress
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-internal val timestampFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
+internal val timestampFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss z", Locale.ENGLISH)
 
 /**
  * Sends the optional system mails (KNot started/stopped, a target reached its rate limit), always through the

@@ -170,7 +170,10 @@ The first rejection of a target is logged; the following ones are not, so an att
   time the limit is reached, a new mail goes out. The mail never contains the API key, and the `429` response
   does not wait for it.
 
-Like every other mail, system mails carry the default target's prefixes.
+Like every other mail, system mails carry the default target's prefixes. Every timestamp KNot prints, in mails
+and in the version output, uses the format `dd.MM.yyyy HH:mm:ss z`, e.g. `19.09.2026 18:40:12 CEST`. The time is
+the local time of the host, the JVM default zone, so it is UTC only if the host runs in UTC. The abbreviation
+is always the English one, independent of the host locale.
 
 **Logging.** Everything goes to stdout/stderr (Klogger), which systemd forwards to the journal. A rejected API
 key is logged with the client address (`X-Forwarded-For` when the proxy sets it). Neither API keys nor SMTP

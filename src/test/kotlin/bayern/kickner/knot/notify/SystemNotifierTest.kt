@@ -38,7 +38,7 @@ class SystemNotifierTest {
         assertEquals("[KNot] KNot started", mail.subject)
         val body = mail.content as String
         assertContains(body, "node-1")
-        assertContains(body, "2026-09-19 18:40:12")
+        assertContains(body, "19.09.2026 18:40:12 CEST")
         assertContains(body, "1.2.3")
     }
 
@@ -64,7 +64,7 @@ class SystemNotifierTest {
         assertContains(body, "'grafana'")
         assertContains(body, "10 requests per minute")
         assertContains(body, "node-1")
-        assertContains(body, "2026-09-19 18:40:12")
+        assertContains(body, "19.09.2026 18:40:12 CEST")
         assertTrue(body.contains("grafana-key").not(), "the API key must not be part of the mail")
     }
 
@@ -91,6 +91,6 @@ class SystemNotifierTest {
         assertEquals("[KNot] KNot stopped", mail.subject)
         val body = mail.content as String
         assertContains(body, "node-1")
-        assertContains(body, "2026-09-19 18:40:12")
+        assertContains(body, "19.09.2026 18:40:12 CEST")
     }
 }
