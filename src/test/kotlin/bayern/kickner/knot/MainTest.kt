@@ -2,6 +2,8 @@ package bayern.kickner.knot
 
 import bayern.kickner.knot.config.config
 import java.io.File
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -55,5 +57,26 @@ class MainTest {
 
         assertEquals(1, run.exitCode)
         assertContains(run.stderr, "Unknown target 'nope'. Configured targets: ops")
+    }
+
+    @Test
+    fun `a missing config exits with 78 so systemd does not restart`() {
+        val run = knot(workingDirectory = emptyDirectory())
+
+        assertEquals(78, run.exitCode, run.stderr)
+        assertContains(run.stderr, "Config file not found")
+    }
+
+    @Test
+    fun `a failed start exits with 1 so systemd restarts`() {
+        ServerSocket(0, 50, InetAddress.getLoopbackAddress()).use { taken ->
+            val directory = emptyDirectory()
+            File(directory, "config.json").writeText(config(listenPort = taken.localPort, sendSystemMails = false))
+
+            val run = knot(workingDirectory = directory)
+
+            assertEquals(1, run.exitCode, run.stderr)
+            assertContains(run.stderr, "Could not start on 127.0.0.1:${taken.localPort}")
+        }
     }
 }

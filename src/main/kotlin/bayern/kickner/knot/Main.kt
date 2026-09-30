@@ -6,26 +6,18 @@ import bayern.kickner.knot.cli.generateApiKey
 import bayern.kickner.knot.cli.sendTestMail
 import bayern.kickner.knot.config.AppConfig
 import bayern.kickner.knot.config.loadConfig
+import bayern.kickner.knot.mail.MailSender
 import bayern.kickner.knot.notify.SystemNotifier
 import bayern.kickner.knot.notify.timestampFormat
-import bayern.kickner.knot.mail.MailSender
 import bayern.kickner.knot.ratelimit.RateLimiter
 import bayern.kickner.knot.routes.healthRoute
 import bayern.kickner.knot.routes.hookRoute
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.cio.CIO
-import io.ktor.server.cio.CIOApplicationEngine
-import io.ktor.server.engine.EmbeddedServer
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.plugins.bodylimit.RequestBodyLimit
-import io.ktor.server.routing.routing
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import io.ktor.server.application.*
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
+import io.ktor.server.plugins.bodylimit.*
+import io.ktor.server.routing.*
+import kotlinx.coroutines.*
 import kotnexlib.ArgsInterpreter
 import kotnexlib.ResultOf
 import kotnexlib.ResultOf2
@@ -37,10 +29,17 @@ import kotlin.system.exitProcess
 private const val TAG = "Main"
 
 /**
- * `EX_CONFIG` from sysexits.h, used when the config file is rejected or the configured address cannot be bound.
- * knot.service lists it in `RestartPreventExitStatus`: a restart cannot fix either, so systemd must not loop.
+ * `EX_CONFIG` from sysexits.h, used when the config file is rejected. knot.service lists it in
+ * `RestartPreventExitStatus`: a restart cannot fix a broken config, so systemd must not loop.
  */
 private const val EXIT_CONFIG_ERROR = 78
+
+/**
+ * The server could not start, typically because the address could not be bound. A plain failure, so systemd
+ * restarts KNot (knot.service limits the attempts): an address that is not assigned yet at boot, e.g. a VPN
+ * interface, usually is a few seconds later.
+ */
+private const val EXIT_START_FAILED = 1
 
 /** Alert texts are short. Anything bigger is a mistake or an attempt to exhaust memory. */
 private const val MAX_BODY_BYTES = 256L * 1024
@@ -53,8 +52,8 @@ val globalScope = CoroutineScope(Dispatchers.Default + SupervisorJob() + Corouti
 
 /**
  * Entry point. Loads the config (`config=<path>`, default `config.json` in the working directory), then serves
- * `/hook` and `/health` until the process is stopped. A config problem or a taken port ends the process with
- * [EXIT_CONFIG_ERROR].
+ * `/hook` and `/health` until the process is stopped. A config problem ends the process with [EXIT_CONFIG_ERROR],
+ * a failed start (e.g. a taken port) with [EXIT_START_FAILED].
  *
  * Two arguments run a one-off command instead of the server: `key` prints a fresh API key (no config needed),
  * `test=<target name>` sends a test mail through that target and exits with 0 on success, 1 otherwise.
@@ -95,7 +94,7 @@ fun main(args: Array<String>) {
 
     runCatching { server.start(wait = true) }.onFailure { error ->
         staticLog(KLogger.Level.ERROR, TAG) { "Could not start on ${config.listenHost}:${config.listenPort}: ${error.rootCause().message}" }
-        exitProcess(EXIT_CONFIG_ERROR)
+        exitProcess(EXIT_START_FAILED)
     }
 }
 

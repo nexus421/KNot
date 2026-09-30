@@ -3,12 +3,7 @@ package bayern.kickner.knot.config
 import bayern.kickner.knot.cli.generateApiKey
 import kotnexlib.ResultOf2
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ConfigLoaderTest {
 
@@ -197,9 +192,12 @@ internal fun config(
     default: String = target(),
     targets: List<String> = emptyList(),
     listenPort: Int = 8080,
-    rateLimitPerMinute: Int = 10
+    rateLimitPerMinute: Int = 10,
+    // null leaves the field out, so tests can still check its default
+    sendSystemMails: Boolean? = null
 ) = """
     {
+      ${sendSystemMails?.let { "\"sendSystemMails\": $it," }.orEmpty()}
       "listenPort": $listenPort,
       "rateLimitPerMinute": $rateLimitPerMinute,
       "default": $default,

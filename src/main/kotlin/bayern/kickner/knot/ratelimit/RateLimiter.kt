@@ -13,9 +13,10 @@ private val WINDOW_MILLIS = 60.seconds.inWholeMilliseconds
  * so that a single notification can be sent per episode: a key that keeps exceeding the limit minute after minute
  * is reported once. The report is re-armed after a full minute within the limit or without any requests.
  *
- * @param clock Current time in epoch milliseconds, injectable for tests.
+ * @param clock Monotonic time in milliseconds, injectable for tests. Only differences count, so the origin is
+ * arbitrary. Deliberately not the wall clock: NTP stepping it back would keep a window from expiring that long.
  */
-class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long = System::currentTimeMillis) {
+class RateLimiter(private val limitPerMinute: Int, private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
 
     enum class Verdict {
         /** Within the limit. */
