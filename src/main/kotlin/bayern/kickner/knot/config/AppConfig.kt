@@ -44,7 +44,7 @@ data class AppConfig(
 /**
  * A webhook target: the API key that selects it, the recipient and the SMTP account to send from.
  *
- * @property name Only used in log messages.
+ * @property name Names the target in log messages, system mails and `test=<name>`. Must be unique.
  * @property apiKey Authenticates the caller and selects this target. Must be unique across all targets.
  * @property to Recipient address.
  * @property subjectPrefix Prepended to the subject as-is (include a trailing space yourself if wanted).
@@ -66,7 +66,7 @@ data class Target(
 }
 
 /**
- * SMTP account. Every field is required. The server certificate is verified whenever TLS is used.
+ * SMTP account. Every field except [tls] is required. The server certificate is verified whenever TLS is used.
  */
 @Serializable
 data class SmtpConfig(

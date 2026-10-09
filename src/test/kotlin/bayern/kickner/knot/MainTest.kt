@@ -49,6 +49,17 @@ class MainTest {
     }
 
     @Test
+    fun `check with a valid config exits with 0 without starting the server`() {
+        val directory = emptyDirectory()
+        File(directory, "config.json").writeText(config())
+
+        val run = knot("check", workingDirectory = directory)
+
+        assertEquals(0, run.exitCode, run.stderr)
+        assertContains(run.stdout + run.stderr, "is valid")
+    }
+
+    @Test
     fun `test with an unknown target exits with 1 and names the configured targets`() {
         val directory = emptyDirectory()
         File(directory, "config.json").writeText(config())

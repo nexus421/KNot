@@ -10,7 +10,7 @@ WorkingDirectory=/home/knot
 ExecStart=/home/knot/run.sh
 Restart=on-failure
 RestartSec=5
-# 78 (EX_CONFIG): the config file was rejected or the address could not be bound - fix it, then `systemctl restart knot`
+# 78 (EX_CONFIG): the config file was rejected. Fix it, then run `systemctl restart knot`.
 RestartPreventExitStatus=78
 # 143: the JVM's exit code after a SIGTERM (systemctl stop), which is a clean stop, not a failure
 SuccessExitStatus=143

@@ -5,19 +5,14 @@ import bayern.kickner.klogger.warnLog
 import bayern.kickner.knot.config.SmtpConfig
 import bayern.kickner.knot.config.Target
 import bayern.kickner.knot.config.TlsMode
-import jakarta.mail.AuthenticationFailedException
-import jakarta.mail.Authenticator
-import jakarta.mail.Message
-import jakarta.mail.PasswordAuthentication
-import jakarta.mail.Session
-import jakarta.mail.Transport
+import jakarta.mail.*
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotnexlib.ResultOf
-import java.util.Properties
+import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -97,13 +92,15 @@ fun smtpProperties(smtp: SmtpConfig): Properties = Properties().apply {
 
 /**
  * Plain-text message from [target]'s sender to its recipient. The charset is explicit: without it Jakarta Mail
- * falls back to the platform encoding and umlauts break.
+ * falls back to the platform encoding and umlauts break. `Auto-Submitted: auto-generated` (RFC 3834) keeps
+ * autoresponders such as out-of-office replies from answering.
  */
 fun buildMessage(session: Session, target: Target, content: MailContent): MimeMessage = MimeMessage(session).apply {
     setFrom(InternetAddress(target.smtp.from))
     setRecipient(Message.RecipientType.TO, InternetAddress(target.to))
     setSubject(content.subject, "UTF-8")
     setText(content.body, "UTF-8")
+    setHeader("Auto-Submitted", "auto-generated")
 }
 
 private fun SmtpConfig.authenticator() = object : Authenticator() {

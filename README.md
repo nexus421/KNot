@@ -43,19 +43,21 @@ Tests: `./gradlew test`. GitHub Actions runs them on every push (`.github/workfl
 | Argument        | Default       | Description                                                                                                                                                                                                |
 |-----------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `config=<path>` | `config.json` | Config file to load (see Configuration).                                                                                                                                                                   |
+| `check`         |               | Only loads and validates the config, then exits. No mail, no server. Useful before `systemctl restart knot`.                                                                                               |
 | `key`           |               | Prints a fresh API key and exits. Needs no config. Only the key goes to stdout (the hint to stderr), so `KEY=$(java -jar knot.jar key)` captures just the key.                                             |
 | `test=<name>`   |               | Sends one test mail through the target `<name>` and exits without starting the server. The config is validated as on a normal start, and the mail carries the target's prefixes, so those are checked too. |
 
-Without `key` or `test=`, KNot starts the server. Exit codes:
+Without `check`, `key` or `test=`, KNot starts the server. Exit codes:
 
 | Code  | Meaning                                                                                                                                                                                                               |
 |-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `0`   | `key` printed, or the test mail was delivered.                                                                                                                                                                        |
+| `0`   | `check`: the config is valid. `key`: key printed. `test=`: the test mail was delivered.                                                                                                                               |
 | `1`   | `test=`: the target is unknown, or the delivery failed after all retries. The log says why. Server: it could not start, e.g. the port is taken or the address is not assigned (yet). systemd retries, see Deployment. |
 | `78`  | The config file is missing or invalid. systemd does not retry, see Deployment.                                                                                                                                        |
 | `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.                                                                                                                                    |
 
 ```bash
+java -jar build/libs/knot.jar check config=/path/to/config.json
 java -jar build/libs/knot.jar key
 java -jar build/libs/knot.jar test=ops config=/path/to/config.json
 ```
@@ -82,7 +84,7 @@ A `Target`:
 
 | Field           | Type   | Default      | Description                                                                                                  |
 |-----------------|--------|--------------|--------------------------------------------------------------------------------------------------------------|
-| `name`          | String | required     | Only used in log messages.                                                                                   |
+| `name`          | String | required     | Names the target in logs, system mails and `test=<name>`. Unique.                                            |
 | `apiKey`        | String | required     | Authenticates the caller and selects the target. Unique, at least 16 characters.                             |
 | `to`            | String | required     | Recipient address.                                                                                           |
 | `subjectPrefix` | String | `""`         | Prepended to the subject as-is.                                                                              |
@@ -118,14 +120,14 @@ Body: a JSON object. Unknown fields are ignored, the `Content-Type` header is no
 Subject and body are then framed by the target: `subjectPrefix + subject` and `bodyPrefix + body + bodyPostfix`.
 Nothing is inserted between the parts, put a trailing space or a line break into the prefix yourself.
 
-| Status | Meaning                                                         |
-|--------|-----------------------------------------------------------------|
-| `200`  | Mail delivered to the SMTP server.                              |
-| `400`  | Not a JSON object, or `body` missing/blank.                     |
-| `401`  | API key missing or unknown.                                     |
-| `413`  | Payload larger than 256 KiB.                                    |
-| `429`  | Rate limit of the target exceeded, nothing was sent.            |
-| `502`  | SMTP delivery failed after all retries, details are in the log. |
+| Status | Meaning                                                                            |
+|--------|------------------------------------------------------------------------------------|
+| `200`  | Mail delivered to the SMTP server.                                                 |
+| `400`  | Not a JSON object, or `body` missing/blank.                                        |
+| `401`  | API key missing or unknown.                                                        |
+| `413`  | Payload larger than 256 KiB.                                                       |
+| `429`  | Rate limit of the target exceeded, nothing was sent. Comes with `Retry-After: 60`. |
+| `502`  | SMTP delivery failed after all retries, details are in the log.                    |
 
 From Kotlin with the [Ktor client](https://ktor.io/docs/client-requests.html) (any engine, no content
 negotiation needed):
@@ -147,6 +149,7 @@ No authentication. Answers `200 ok` as long as the process runs, intended for mo
 **Delivery.** Synchronous within the request: 3 attempts with 1 s and 3 s pauses, 5 s connect and 10 s
 read/write timeout. Rejected credentials are not retried, to avoid SMTP account lockouts. If all attempts fail,
 the caller gets `502` after up to about 50 s. Give the client a matching timeout to avoid duplicate mails.
+Every mail carries `Auto-Submitted: auto-generated` (RFC 3834), so out-of-office replies do not answer it.
 
 **Rate limiting.** `rateLimitPerMinute` per target in a fixed one-minute window (monotonic clock, in memory,
 reset on restart). Excess requests get `429`. Only the first rejection is logged. Meant against leaked keys,
@@ -172,6 +175,7 @@ restarts KNot after a failed start (exit code 1), but not after a rejected confi
 - Use the fat JAR from the release. It needs Java 25 or newer, Amazon Corretto is recommended.
 - Start it with `java -jar /path/to/knot.jar`, from a run script or directly in `ExecStart`.
 - Run it as its own unprivileged user, e.g. `knot`.
+- `chmod 600 config.json`, owned by that user. It holds SMTP passwords and API keys, other local users must not read it.
 
 ## Not in scope (deliberately)
 

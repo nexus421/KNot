@@ -8,16 +8,10 @@ import bayern.kickner.knot.noRetryDelays
 import bayern.kickner.knot.notify.SystemNotifier
 import bayern.kickner.knot.ratelimit.RateLimiter
 import bayern.kickner.knot.testConfig
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
-import io.ktor.server.testing.ApplicationTestBuilder
-import io.ktor.server.testing.testApplication
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.server.testing.*
 import jakarta.mail.Message
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -191,7 +185,9 @@ class HookRouteTest {
 
         assertEquals(HttpStatusCode.OK, hook(apiKey = GRAFANA_KEY).status)
         assertEquals(HttpStatusCode.OK, hook(apiKey = GRAFANA_KEY).status)
-        assertEquals(HttpStatusCode.TooManyRequests, hook(apiKey = GRAFANA_KEY).status)
+        val rejected = hook(apiKey = GRAFANA_KEY)
+        assertEquals(HttpStatusCode.TooManyRequests, rejected.status)
+        assertEquals("60", rejected.headers[HttpHeaders.RetryAfter])
         assertEquals(HttpStatusCode.OK, hook(apiKey = OPS_KEY).status)
         assertEquals(3, transport.calls)
     }

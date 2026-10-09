@@ -21,6 +21,7 @@ import kotlinx.coroutines.*
 import kotnexlib.ArgsInterpreter
 import kotnexlib.ResultOf
 import kotnexlib.ResultOf2
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.concurrent.thread
@@ -36,7 +37,7 @@ private const val EXIT_CONFIG_ERROR = 78
 
 /**
  * The server could not start, typically because the address could not be bound. A plain failure, so systemd
- * restarts KNot (knot.service limits the attempts): an address that is not assigned yet at boot, e.g. a VPN
+ * restarts KNot: an address that is not assigned yet at boot, e.g. a VPN
  * interface, usually is a few seconds later.
  */
 private const val EXIT_START_FAILED = 1
@@ -44,7 +45,7 @@ private const val EXIT_START_FAILED = 1
 /** Alert texts are short. Anything bigger is a mistake or an attempt to exhaust memory. */
 private const val MAX_BODY_BYTES = 256L * 1024
 
-/** Version and build time for the log banner and the mails, e.g. `1.0.0 (built 2026-09-20 12:06:19 CEST)`. */
+/** Version and build time for the log banner and the mails, e.g. `1.0.0 (built 20.09.2026 12:06:19 CEST)`. */
 internal val appVersion: String =
     "${BuildConfig.VERSION} (built ${Instant.ofEpochMilli(BuildConfig.BUILD_TIME).atZone(ZoneId.systemDefault()).format(timestampFormat)})"
 
@@ -55,8 +56,9 @@ val globalScope = CoroutineScope(Dispatchers.Default + SupervisorJob() + Corouti
  * `/hook` and `/health` until the process is stopped. A config problem ends the process with [EXIT_CONFIG_ERROR],
  * a failed start (e.g. a taken port) with [EXIT_START_FAILED].
  *
- * Two arguments run a one-off command instead of the server: `key` prints a fresh API key (no config needed),
- * `test=<target name>` sends a test mail through that target and exits with 0 on success, 1 otherwise.
+ * Three arguments run a one-off command instead of the server: `key` prints a fresh API key (no config needed),
+ * `check` only loads and validates the config, `test=<target name>` sends a test mail through that target and
+ * exits with 0 on success, 1 otherwise.
  */
 fun main(args: Array<String>) {
     // Ktor logs through SLF4J, only its warnings and errors are worth the journal
@@ -75,12 +77,18 @@ fun main(args: Array<String>) {
     }
 
     val arguments = ArgsInterpreter(args)
-    val config = when (val result = loadConfig(arguments.getValue("config") ?: "config.json")) {
+    val configPath = arguments.getValue("config") ?: "config.json"
+    val config = when (val result = loadConfig(configPath)) {
         is ResultOf2.Success -> result.value
         is ResultOf2.Failure -> {
             staticLog(KLogger.Level.ERROR, TAG) { result.value }
             exitProcess(EXIT_CONFIG_ERROR)
         }
+    }
+
+    if (args.contains("check")) {
+        staticLog(KLogger.Level.INFO, TAG) { "Config file ${File(configPath).absolutePath} is valid" }
+        return
     }
 
     val mailSender = MailSender()

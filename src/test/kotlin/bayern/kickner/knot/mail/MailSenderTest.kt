@@ -1,7 +1,7 @@
 package bayern.kickner.knot.mail
 
-import bayern.kickner.knot.config.TlsMode
 import bayern.kickner.knot.RecordingTransport
+import bayern.kickner.knot.config.TlsMode
 import bayern.kickner.knot.noRetryDelays
 import bayern.kickner.knot.testSmtp
 import bayern.kickner.knot.testTarget
@@ -10,14 +10,8 @@ import jakarta.mail.Message
 import jakarta.mail.Session
 import kotlinx.coroutines.runBlocking
 import kotnexlib.ResultOf
-import java.util.Properties
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNull
-import kotlin.test.assertSame
+import java.util.*
+import kotlin.test.*
 
 class MailSenderTest {
 
@@ -72,6 +66,7 @@ class MailSenderTest {
         assertContains(message.getHeader("Subject").single(), "=?UTF-8?")
         assertContains(message.getHeader("Content-Type").single(), "charset=UTF-8")
         assertEquals("Ça va?", message.content)
+        assertEquals("auto-generated", message.getHeader("Auto-Submitted").single())
     }
 
     @Test

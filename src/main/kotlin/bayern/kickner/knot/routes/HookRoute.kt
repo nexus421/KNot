@@ -8,14 +8,11 @@ import bayern.kickner.knot.mail.compose
 import bayern.kickner.knot.notify.SystemNotifier
 import bayern.kickner.knot.ratelimit.RateLimiter
 import bayern.kickner.knot.ratelimit.RateLimiter.Verdict
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.plugins.origin
-import io.ktor.server.request.header
-import io.ktor.server.request.receiveText
-import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.RoutingCall
-import io.ktor.server.routing.post
+import io.ktor.http.*
+import io.ktor.server.plugins.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -24,6 +21,9 @@ import kotnexlib.ResultOf
 private const val TAG = "HookRoute"
 private const val API_KEY_HEADER = "X-API-Key"
 private const val API_KEY_QUERY_PARAMETER = "apiKey"
+
+/** The rate limit window is one minute, so a request is allowed again after 60 s at the latest. */
+private const val RETRY_AFTER_SECONDS = "60"
 
 /**
  * JSON payload of a hook request. Everything else in the document is ignored.
@@ -38,7 +38,7 @@ private val payloadJson = Json { ignoreUnknownKeys = true }
 
 /**
  * `POST /hook`: authenticates the caller by API key, applies the per-target rate limit, then sends the
- * framed payload as a mail. Failures map to 401 (no or unknown key), 429 (rate limit), 400 (payload)
+ * framed payload as a mail. Failures map to 401 (no or unknown key), 429 (rate limit, with `Retry-After`), 400 (payload)
  * and 502 (delivery failed after all retries).
  *
  * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode. That
@@ -72,6 +72,7 @@ fun Route.hookRoute(
                         systemNotifier.notifyRateLimitReached(target, config.rateLimitPerMinute)
                     }
                 }
+                call.response.header(HttpHeaders.RetryAfter, RETRY_AFTER_SECONDS)
                 return@post call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded")
             }
         }
