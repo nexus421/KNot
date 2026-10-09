@@ -52,7 +52,7 @@ Without `key` or `test=`, KNot starts the server. Exit codes:
 |-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `0`   | `key` printed, or the test mail was delivered.                                                                                                                                                                        |
 | `1`   | `test=`: the target is unknown, or the delivery failed after all retries. The log says why. Server: it could not start, e.g. the port is taken or the address is not assigned (yet). systemd retries, see Deployment. |
-| `78`  | The config file is missing or invalid. See Deployment.                                                                                                                                                                |
+| `78`  | The config file is missing or invalid. systemd does not retry, see Deployment.                                                                                                                                        |
 | `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.                                                                                                                                    |
 
 ```bash
@@ -166,11 +166,12 @@ address (`X-Forwarded-For` if set). API keys and SMTP passwords are never logged
 
 ## Deployment
 
-[knot.service](knot.service) -> Example systemd-file. Place it at /etc/systemd/system/knot.service.
+[knot.service](knot.service) is an example systemd unit for `/etc/systemd/system/knot.service`. systemd
+restarts KNot after a failed start (exit code 1), but not after a rejected config (78).
 
-- Amazon Corretto 25 or newer is recommended
-- Use the Fat JAR from the release
-- Create a run script with `java -jar /path/to/jar/knot.jar` (or place it directly in the systemd file)
+- Use the fat JAR from the release. It needs Java 25 or newer, Amazon Corretto is recommended.
+- Start it with `java -jar /path/to/knot.jar`, from a run script or directly in `ExecStart`.
+- Run it as its own unprivileged user, e.g. `knot`.
 
 ## Not in scope (deliberately)
 
