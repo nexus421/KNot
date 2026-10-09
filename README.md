@@ -47,12 +47,13 @@ Tests: `./gradlew test`. GitHub Actions runs them on every push (`.github/workfl
 | `key`           |               | Prints a fresh API key and exits. Needs no config. Only the key goes to stdout (the hint to stderr), so `KEY=$(java -jar knot.jar key)` captures just the key.                                             |
 | `test=<name>`   |               | Sends one test mail through the target `<name>` and exits without starting the server. The config is validated as on a normal start, and the mail carries the target's prefixes, so those are checked too. |
 
-Without `check`, `key` or `test=`, KNot starts the server. Exit codes:
+Without `check`, `key` or `test=`, KNot starts the server. Any other argument is rejected. Exit codes:
 
 | Code  | Meaning                                                                                                                                                                                                               |
 |-------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `0`   | `check`: the config is valid. `key`: key printed. `test=`: the test mail was delivered.                                                                                                                               |
 | `1`   | `test=`: the target is unknown, or the delivery failed after all retries. The log says why. Server: it could not start, e.g. the port is taken or the address is not assigned (yet). systemd retries, see Deployment. |
+| `64`  | Unknown command line argument. systemd does not retry, see Deployment.                                                                                                                                                |
 | `78`  | The config file is missing or invalid. systemd does not retry, see Deployment.                                                                                                                                        |
 | `143` | The JVM's exit code after SIGTERM (`systemctl stop`). A clean stop, not a failure.                                                                                                                                    |
 
@@ -98,7 +99,8 @@ A `Target`:
 | `smtp.tls`      | String | `"starttls"` | `"starttls"` (required, not optional), `"ssl"` (implicit TLS) or `"none"` (plaintext, internal relays only). |
 
 The server certificate is always verified when TLS is used. See [config.example.json](config.example.json)
-for a complete example. Generate API keys with `java -jar knot.jar key`.
+for a complete example. Its placeholder API keys are too short on purpose, so KNot refuses to start until
+they are replaced. Generate API keys with `java -jar knot.jar key`.
 
 ## Endpoints
 
@@ -148,8 +150,9 @@ No authentication. Answers `200 ok` as long as the process runs, intended for mo
 
 **Delivery.** Synchronous within the request: 3 attempts with 1 s and 3 s pauses, 5 s connect and 10 s
 read/write timeout. Rejected credentials are not retried, to avoid SMTP account lockouts. If all attempts fail,
-the caller gets `502` after up to about 50 s. Give the client a matching timeout to avoid duplicate mails.
-Every mail carries `Auto-Submitted: auto-generated` (RFC 3834), so out-of-office replies do not answer it.
+the caller gets `502`, with an unreachable SMTP server after about 50 s. Give the client a matching timeout to
+avoid duplicate mails. Every mail carries `Auto-Submitted: auto-generated` (RFC 3834), so compliant
+autoresponders such as out-of-office replies do not answer it.
 
 **Rate limiting.** `rateLimitPerMinute` per target in a fixed one-minute window (monotonic clock, in memory,
 reset on restart). Excess requests get `429`. Only the first rejection is logged. Meant against leaked keys,
@@ -170,7 +173,8 @@ address (`X-Forwarded-For` if set). API keys and SMTP passwords are never logged
 ## Deployment
 
 [knot.service](knot.service) is an example systemd unit for `/etc/systemd/system/knot.service`. systemd
-restarts KNot after a failed start (exit code 1), but not after a rejected config (78).
+restarts KNot after a failed start (exit code 1), at most 5 times in 5 minutes, as every attempt sends a
+started and a stopped mail. It does not restart after a wrong command line (64) or a rejected config (78).
 
 - Use the fat JAR from the release. It needs Java 25 or newer, Amazon Corretto is recommended.
 - Start it with `java -jar /path/to/knot.jar`, from a run script or directly in `ExecStart`.

@@ -50,7 +50,7 @@ private fun validate(config: AppConfig): List<String> {
 
     val duplicateKeys = config.allTargets.groupBy { it.apiKey }.filterValues { it.size > 1 }.values
     duplicateKeys.forEach { targets -> issues += "apiKey of ${targets.joinToString(" and ") { "'${it.name}'" }} is not unique" }
-    // Names only appear in log lines, but a duplicate would make those lines ambiguous
+    // Names select the target for `test=` and appear in logs and system mails, a duplicate would be ambiguous
     val duplicateNames = config.allTargets.groupBy { it.name }.filterValues { it.size > 1 }.keys
     duplicateNames.forEach { name -> issues += "target name '$name' is not unique" }
 

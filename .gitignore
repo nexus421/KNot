@@ -1,5 +1,5 @@
 ### KNot ###
-# The real config holds SMTP passwords and API keys - only config.example.json is versioned
+# The real config holds SMTP passwords and API keys. Only config.example.json is versioned
 config.json
 
 .gradle

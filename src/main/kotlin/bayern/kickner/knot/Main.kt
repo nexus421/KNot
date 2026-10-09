@@ -1,6 +1,7 @@
 package bayern.kickner.knot
 
 import bayern.kickner.klogger.KLogger
+import bayern.kickner.klogger.slf4j.slf4jBridge
 import bayern.kickner.klogger.staticLog
 import bayern.kickner.knot.cli.generateApiKey
 import bayern.kickner.knot.cli.sendTestMail
@@ -37,10 +38,18 @@ private const val EXIT_CONFIG_ERROR = 78
 
 /**
  * The server could not start, typically because the address could not be bound. A plain failure, so systemd
- * restarts KNot: an address that is not assigned yet at boot, e.g. a VPN
- * interface, usually is a few seconds later.
+ * restarts KNot (knot.service allows 5 starts in 5 minutes): an address that is not assigned yet at boot, e.g. a
+ * VPN interface, usually is a few seconds later.
  */
 private const val EXIT_START_FAILED = 1
+
+/**
+ * `EX_USAGE` from sysexits.h: an unknown command line argument. A typo must not silently start the server, and
+ * knot.service does not restart on it either.
+ */
+private const val EXIT_USAGE = 64
+
+private const val USAGE = "Usage: java -jar knot.jar [config=<path>] [check | key | test=<target name>]"
 
 /** Alert texts are short. Anything bigger is a mistake or an attempt to exhaust memory. */
 private const val MAX_BODY_BYTES = 256L * 1024
@@ -58,14 +67,20 @@ val globalScope = CoroutineScope(Dispatchers.Default + SupervisorJob() + Corouti
  *
  * Three arguments run a one-off command instead of the server: `key` prints a fresh API key (no config needed),
  * `check` only loads and validates the config, `test=<target name>` sends a test mail through that target and
- * exits with 0 on success, 1 otherwise.
+ * exits with 0 on success, 1 otherwise. Any other argument ends the process with [EXIT_USAGE].
  */
 fun main(args: Array<String>) {
-    // Ktor logs through SLF4J, only its warnings and errors are worth the journal
-    System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
     KLogger.configure {
         logToConsole()
         minLevel = KLogger.Level.DEBUG
+        // Ktor logs through SLF4J, which Klogger picks up. Only its warnings and errors are worth the journal.
+        slf4jBridge { minLevel = KLogger.Level.WARN }
+    }
+
+    val unknown = args.filterNot(::isKnownArgument)
+    if (unknown.isNotEmpty()) {
+        staticLog(KLogger.Level.ERROR, TAG) { "Unknown argument(s): ${unknown.joinToString(" ")}. $USAGE" }
+        exitProcess(EXIT_USAGE)
     }
 
     // ArgsInterpreter only knows `key=value` pairs and `-flags`, a bare word is checked directly
@@ -147,5 +162,9 @@ fun Application.knot(config: AppConfig, mailSender: MailSender, rateLimiter: Rat
         hookRoute(config, mailSender, rateLimiter, systemNotifier)
     }
 }
+
+/** True for every argument KNot knows. */
+private fun isKnownArgument(arg: String) =
+    arg == "key" || arg == "check" || arg.startsWith("config=") || arg.startsWith("test=")
 
 private fun Throwable.rootCause(): Throwable = generateSequence(this) { it.cause }.last()

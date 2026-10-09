@@ -60,6 +60,24 @@ class MainTest {
     }
 
     @Test
+    fun `check with an invalid config exits with 78`() {
+        val directory = emptyDirectory()
+        File(directory, "config.json").writeText("{}")
+
+        val run = knot("check", workingDirectory = directory)
+
+        assertEquals(78, run.exitCode, run.stderr)
+    }
+
+    @Test
+    fun `an unknown argument exits with 64 without starting the server`() {
+        val run = knot("chek", workingDirectory = emptyDirectory())
+
+        assertEquals(64, run.exitCode, run.stderr)
+        assertContains(run.stderr, "Unknown argument(s): chek")
+    }
+
+    @Test
     fun `test with an unknown target exits with 1 and names the configured targets`() {
         val directory = emptyDirectory()
         File(directory, "config.json").writeText(config())

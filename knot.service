@@ -1,8 +1,12 @@
 [Unit]
-Description=KNot - Webhook to SMTP Mail
-#This is an example. Edit it to your needs.
+Description=KNot, webhook to SMTP mail
+# This is an example. Edit it to your needs.
 After=network-online.target
 Wants=network-online.target
+# A start that keeps failing (e.g. a taken port) gives up after 5 attempts in 5 minutes.
+# Every attempt sends a started and a stopped system mail, so endless restarts would flood the inbox.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,8 +14,9 @@ WorkingDirectory=/home/knot
 ExecStart=/home/knot/run.sh
 Restart=on-failure
 RestartSec=5
-# 78 (EX_CONFIG): the config file was rejected. Fix it, then run `systemctl restart knot`.
-RestartPreventExitStatus=78
+# 64 (EX_USAGE): unknown command line argument. 78 (EX_CONFIG): the config file was rejected.
+# A restart cannot fix either. Fix it, then run `systemctl restart knot`.
+RestartPreventExitStatus=64 78
 # 143: the JVM's exit code after a SIGTERM (systemctl stop), which is a clean stop, not a failure
 SuccessExitStatus=143
 User=knot

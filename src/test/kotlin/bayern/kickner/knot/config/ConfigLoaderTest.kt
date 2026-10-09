@@ -34,6 +34,13 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `the example config is rejected until its api keys are replaced`() {
+        val result = loadConfig("config.example.json")
+
+        assertContains(assertIs<ResultOf2.Failure<String>>(result).value, "apiKey must be at least 16 characters long")
+    }
+
+    @Test
     fun `missing file is reported`() {
         val result = loadConfig("/nonexistent/knot-config.json")
 

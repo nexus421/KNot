@@ -185,9 +185,12 @@ class HookRouteTest {
 
         assertEquals(HttpStatusCode.OK, hook(apiKey = GRAFANA_KEY).status)
         assertEquals(HttpStatusCode.OK, hook(apiKey = GRAFANA_KEY).status)
-        val rejected = hook(apiKey = GRAFANA_KEY)
-        assertEquals(HttpStatusCode.TooManyRequests, rejected.status)
-        assertEquals("60", rejected.headers[HttpHeaders.RetryAfter])
+        // The first rejection reaches the limit, the second one is a plain rejection. Both carry Retry-After.
+        repeat(2) {
+            val rejected = hook(apiKey = GRAFANA_KEY)
+            assertEquals(HttpStatusCode.TooManyRequests, rejected.status)
+            assertEquals("60", rejected.headers[HttpHeaders.RetryAfter])
+        }
         assertEquals(HttpStatusCode.OK, hook(apiKey = OPS_KEY).status)
         assertEquals(3, transport.calls)
     }

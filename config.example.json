@@ -6,7 +6,7 @@
   "allowApiKeyInQuery": false,
   "default": {
     "name": "ops",
-    "apiKey": "REPLACE_ME_WITH_A_LONG_RANDOM_KEY",
+    "apiKey": "REPLACE_ME_1",
     "to": "ops@example.com",
     "subjectPrefix": "[KNot] ",
     "bodyPrefix": "",
@@ -23,7 +23,7 @@
   "targets": [
     {
       "name": "grafana",
-      "apiKey": "REPLACE_ME_WITH_ANOTHER_LONG_RANDOM_KEY",
+      "apiKey": "REPLACE_ME_2",
       "to": "alerts@example.com",
       "subjectPrefix": "[Grafana] ",
       "bodyPrefix": "",

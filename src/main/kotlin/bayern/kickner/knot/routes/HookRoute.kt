@@ -38,8 +38,8 @@ private val payloadJson = Json { ignoreUnknownKeys = true }
 
 /**
  * `POST /hook`: authenticates the caller by API key, applies the per-target rate limit, then sends the
- * framed payload as a mail. Failures map to 401 (no or unknown key), 429 (rate limit, with `Retry-After`), 400 (payload)
- * and 502 (delivery failed after all retries).
+ * framed payload as a mail. Failures map to 401 (no or unknown key), 429 (rate limit, with `Retry-After`),
+ * 400 (payload), 413 (payload too large) and 502 (delivery failed after all retries).
  *
  * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode. That
  * mail is sent in the background so the 429 does not wait for SMTP.
@@ -94,8 +94,11 @@ fun Route.hookRoute(
     }
 }
 
-/** Behind the reverse proxy the connection peer is always the proxy. Its forwarded header names the real client. */
-private fun RoutingCall.clientAddress(): String = request.header("X-Forwarded-For") ?: request.origin.remoteHost
+/**
+ * Behind the reverse proxy the connection peer is always the proxy. Its forwarded header names the real client.
+ * The IP address, not the host name: that would cost a reverse DNS lookup and log a name the client controls.
+ */
+private fun RoutingCall.clientAddress(): String = request.header("X-Forwarded-For") ?: request.origin.remoteAddress
 
 /** The presented API key: the header wins, the query parameter only counts when enabled. Blank values count as absent. */
 private fun RoutingCall.apiKey(allowQueryParameter: Boolean): String? {

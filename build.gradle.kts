@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "bayern.kickner"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    implementation("bayern.kickner:Klogger:0.1.0")
+    implementation("bayern.kickner:Klogger:0.4.0")
     implementation("bayern.kickner:KotNexLib:4.4.1")
 
     implementation("io.ktor:ktor-server-core")
@@ -26,8 +26,6 @@ dependencies {
 
     implementation("jakarta.mail:jakarta.mail-api:2.1.5")
     runtimeOnly("org.eclipse.angus:angus-mail:2.0.5")
-    // Ktor logs through SLF4J; without a provider its warnings would be lost and SLF4J complains at startup
-    runtimeOnly("org.slf4j:slf4j-simple:2.0.18")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host")

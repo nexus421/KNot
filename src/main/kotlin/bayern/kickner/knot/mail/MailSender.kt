@@ -93,7 +93,7 @@ fun smtpProperties(smtp: SmtpConfig): Properties = Properties().apply {
 /**
  * Plain-text message from [target]'s sender to its recipient. The charset is explicit: without it Jakarta Mail
  * falls back to the platform encoding and umlauts break. `Auto-Submitted: auto-generated` (RFC 3834) keeps
- * autoresponders such as out-of-office replies from answering.
+ * compliant autoresponders such as out-of-office replies from answering.
  */
 fun buildMessage(session: Session, target: Target, content: MailContent): MimeMessage = MimeMessage(session).apply {
     setFrom(InternetAddress(target.smtp.from))
