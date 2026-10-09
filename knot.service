@@ -1,32 +1,20 @@
 [Unit]
 Description=KNot - Webhook to SMTP Mail
-# network-online: the startup mail needs DNS and a route right away, network.target alone is too early after a reboot
+#This is an example. Edit it to your needs.
 After=network-online.target
 Wants=network-online.target
-# At most 5 starts within 2 minutes, then systemd gives up (unit "failed", result "start-limit-hit"). Bounds the
-# restart loop after a failed start or a crash, and with it the started/stopped mails of every attempt.
-# Start again after fixing the cause: `systemctl reset-failed knot && systemctl start knot`
-StartLimitIntervalSec=120
-StartLimitBurst=5
 
 [Service]
 Type=simple
-# A throwaway user for every run instead of root: read-only file system, /root and /home read-only, private /tmp.
-# KNot needs no root, its port is above 1024 and it writes no files. No User= line: naming an existing user
-# (e.g. root) makes systemd use that one instead of a throwaway user.
-DynamicUser=yes
-# systemd reads the config as root and hands the service a private copy in %d (the credentials directory),
-# so config.json stays readable by root only (chmod 600)
-LoadCredential=config.json:/root/knot/config.json
-# The service user must be able to read the jar. Below /root (mode 700) that takes `chmod 711 /root`.
-ExecStart=/usr/bin/java -jar /root/knot/knot.jar config=%d/config.json
-# 1 (start failed, e.g. the address is not assigned yet at boot) or a crash: try again after 10 s
+WorkingDirectory=/root/
+ExecStart=/root/run.sh
 Restart=on-failure
-RestartSec=10
-# 78 (EX_CONFIG): the config file was rejected - fix it, then `systemctl restart knot`
+RestartSec=5
+# 78 (EX_CONFIG): the config file was rejected or the address could not be bound - fix it, then `systemctl restart knot`
 RestartPreventExitStatus=78
 # 143: the JVM's exit code after a SIGTERM (systemctl stop), which is a clean stop, not a failure
 SuccessExitStatus=143
+User=root
 
 [Install]
 WantedBy=multi-user.target

@@ -144,76 +144,37 @@ No authentication. Answers `200 ok` as long as the process runs, intended for mo
 
 ## Behaviour
 
-**Delivery.** Mails are sent synchronously inside the request: 3 attempts with 1 s and 3 s pauses in between,
-5 s connect and 10 s read/write timeouts per attempt. Rejected credentials are not retried (repeated failed
-logins get SMTP accounts locked). Failed attempts are logged with the target name, never with credentials.
-After the last failed attempt the caller gets `502`. With an unreachable SMTP server a request can therefore
-take up to about 50 s before it fails. Give the sending side a matching timeout, or it may retry and produce
-duplicate mails.
+**Delivery.** Synchronous within the request: 3 attempts with 1 s and 3 s pauses, 5 s connect and 10 s
+read/write timeout. Rejected credentials are not retried, to avoid SMTP account lockouts. If all attempts fail,
+the caller gets `502` after up to about 50 s. Give the client a matching timeout to avoid duplicate mails.
 
-**Rate limiting.** A fixed one-minute window per target, counted in memory from the first request of the
-window. Time is taken from the monotonic clock, so setting the system clock (NTP, by hand) does not stretch or
-shorten a window. Requests beyond `rateLimitPerMinute` are answered with `429` without sending anything. A
-restart resets the counters, which is harmless. This limits the damage of a leaked key, it is not an anti-DoS
-measure.
-The first rejection of a target is logged, the following ones are not, so an attack cannot flood the journal.
+**Rate limiting.** `rateLimitPerMinute` per target in a fixed one-minute window (monotonic clock, in memory,
+reset on restart). Excess requests get `429`. Only the first rejection is logged. Meant against leaked keys,
+not against DoS.
 
-**System mails.** Unless `sendSystemMails` is `false`, `default` receives:
+**System mails.** Sent to `default` (with its prefixes) unless `sendSystemMails` is `false`:
 
-- `KNot started` (host, time, version) when KNot starts up. It is sent before the port is bound, so a start
-  that fails because the port is taken still sends it. Best effort: a failure is logged and the service keeps
-  running. As systemd retries a failed start (see Deployment), a lasting problem produces one started/stopped
-  pair per attempt, at most five.
-- `KNot stopped` (host, time) from a JVM shutdown hook, i.e. on every orderly end of the process:
-  `systemctl stop`, SIGTERM, Ctrl+C, and also the exit with code 1 after a failed start (e.g. a taken port),
-  but not after a crash or `kill -9`. The process ends once the delivery attempt is over.
-- `KNot rate limit reached: <target>` when a target starts exceeding its rate limit, once per episode, not
-  per rejected request: while the target keeps exceeding the limit minute after minute, no further mail is
-  sent. The report is re-armed after a full minute within the limit (or without any requests), so the next
-  time the limit is reached, a new mail goes out. The mail never contains the API key, and the `429` response
-  does not wait for it.
+- `KNot started` (host, time, version) on startup, before the port is bound. A failure is only logged.
+- `KNot stopped` (host, time) on every orderly shutdown, including a failed start. Not after a crash or `kill -9`.
+- `KNot rate limit reached: <target>` once per episode. Re-armed after a full minute within the limit.
 
-Like every other mail, system mails carry the default target's prefixes. Every timestamp KNot prints, in mails
-and in the version output, uses the format `dd.MM.yyyy HH:mm:ss z`, e.g. `19.09.2026 18:40:12 CEST`. The time is
-the local time of the host, the JVM default zone, so it is UTC only if the host runs in UTC. The abbreviation
-is always the English one, independent of the host locale.
+Timestamps use `dd.MM.yyyy HH:mm:ss z` in the host time zone with English abbreviations, e.g.
+`19.09.2026 18:40:12 CEST`.
 
-**Logging.** Everything goes to stdout/stderr (Klogger), which systemd forwards to the journal. A rejected API
-key is logged with the client address (`X-Forwarded-For` when the proxy sets it). Neither API keys nor SMTP
-passwords are ever logged.
+**Logging.** stdout/stderr, forwarded to the journal by systemd. Rejected API keys are logged with the client
+address (`X-Forwarded-For` if set). API keys and SMTP passwords are never logged.
 
 ## Deployment
 
-[knot.service](knot.service) runs KNot from `/root/knot` with `/usr/bin/java`, but not as root: `DynamicUser=yes`
-gives every run a throwaway user with a read-only view of the file system and a private `/tmp`. systemd reads
-the config as root and hands the service a private copy (`LoadCredential=`), so `config.json` stays readable by
-root only. The jar has to be readable by the service user, which below `/root` (mode 700) takes
-`chmod 711 /root`: others may then pass through `/root`, but not list it. Build `knot.jar` yourself or take it
-from the [Releases](https://github.com/nexus421/KNot/releases) page. As root on the target machine:
+[knot.service](knot.service) -> Example systemd-file. Place it at /etc/systemd/system/knot.service.
 
-```bash
-./gradlew buildFatJar                                      # -> build/libs/knot.jar
-mkdir -p /root/knot && cp build/libs/knot.jar /root/knot/
-chmod 711 /root                                            # the service user may pass through /root to the jar
-# /root/knot/config.json must exist (see Configuration), chmod 600 it, it holds SMTP passwords
-# copy knot.service to /etc/systemd/system/ and adjust the paths or the java binary there if your setup differs
-systemctl daemon-reload && systemctl enable --now knot.service
-```
-
-In a container, a start failing with `status=226/NAMESPACE` means the container does not allow the sandbox. Then
-remove `DynamicUser=` and `LoadCredential=` and pass `config=/root/knot/config.json` again (KNot runs as root).
-
-The unit waits for `network-online.target` so the startup mail can be delivered and treats the JVM's exit code
-143 after `systemctl stop` as success. After a failed start (exit code 1, e.g. an address that is not assigned
-yet at boot) or a crash it restarts KNot every 10 s, at most 5 starts within 2 minutes. Then the unit stays
-`failed` with the result `start-limit-hit`. A rejected config (exit code 78) is never retried. Either way, fix
-the cause, then `systemctl reset-failed knot.service && systemctl restart knot.service`. Put a reverse proxy in
-front for TLS.
+- Amazon Corretto 25 or newer is recommended
+- Use the Fat JAR from the release
+- Create a run script with `java -jar /path/to/jar/knot.jar` (or place it directly in the systemd file)
 
 ## Not in scope (deliberately)
 
 No templating, no attachments, no HTML mails, no config hot reload, no TLS in the app, no persistence.
-Ideas for later: per-target rate limits, `cc`/`bcc`, HMAC-signed requests, a metrics endpoint.
 
 ## License
 
