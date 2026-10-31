@@ -1,7 +1,7 @@
 # Deployment
 
-Take `knot.jar` from a [GitHub release](https://github.com/nexus421/KNot/releases) or build it with
-`./gradlew buildFatJar` (then it is `build/libs/knot.jar`). It needs Java 25 or newer, Amazon Corretto is
+Take `knot.jar` from a [GitHub release](https://github.com/nexus421/KNot/releases) (check it with
+`sha256sum -c knot.jar.sha256`) or build it with `./gradlew buildFatJar` (then it is `build/libs/knot.jar`). It needs Java 25 or newer, Amazon Corretto is
 recommended. Write `config.json` from [config.example.json](../config.example.json).
 
 ## systemd

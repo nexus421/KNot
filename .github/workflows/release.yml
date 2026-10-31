@@ -1,0 +1,47 @@
+name: Release
+
+# Runs when a release is published on GitHub. The tag must match the version in build.gradle.kts (tag v1.2.0 needs
+# version = "1.2.0"), otherwise the run fails and attaches nothing. Then it runs all tests, builds knot.jar, checks
+# it and attaches it together with its SHA-256 sum.
+on:
+  release:
+    types: [published]
+
+# Attaching files to the release needs write access to the repository contents
+permissions:
+  contents: write
+
+jobs:
+  jar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check that the tag matches the version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in build.gradle.kts"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: corretto
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - run: ./gradlew test buildFatJar
+
+      - name: Check SLF4J provider in the fat JAR
+        run: test "$(unzip -p build/libs/knot.jar META-INF/services/org.slf4j.spi.SLF4JServiceProvider)" = "bayern.kickner.klogger.slf4j.KloggerServiceProvider"
+
+      - name: Attach knot.jar and its checksum to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/libs
+          sha256sum knot.jar > knot.jar.sha256
+          gh release upload "$GITHUB_REF_NAME" knot.jar knot.jar.sha256 --clobber --repo "$GITHUB_REPOSITORY"

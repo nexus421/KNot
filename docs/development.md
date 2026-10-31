@@ -14,11 +14,25 @@ Gradle wrapper.
 ```
 
 `buildFatJar` builds `build/libs/knot.jar`. `./gradlew run` starts KNot from the sources and reads `config.json` in
-the project directory. GitHub Actions runs the tests on every push
-([test.yml](../.github/workflows/test.yml)).
+the project directory. GitHub Actions runs the tests and builds the fat JAR on every push
+([test.yml](../.github/workflows/test.yml)), then checks that Klogger is the SLF4J provider in it.
 
 `BuildConfig` (`VERSION` from `build.gradle.kts`, `BUILD_TIME` in Unix milliseconds) is generated into `build/` on
 every build. It is never committed.
+
+## Release
+
+1. Set `version` in `build.gradle.kts`, commit and push.
+2. Publish a release on GitHub with the tag `v<version>`, e.g. `v1.2.0` for `version = "1.2.0"`.
+
+[release.yml](../.github/workflows/release.yml) then checks that the tag matches the version, runs all tests, builds
+`knot.jar` and attaches it to the release together with `knot.jar.sha256`. A tag that does not match fails the run
+and attaches nothing.
+
+The actions in both workflows are pinned to commit hashes, the comment names the version. Update both together.
+`gradle/actions/setup-gradle` v6 keeps its caching in a closed-source component under the Gradle Terms of Use
+(https://gradle.com/legal/terms-of-use/), using it means accepting them. `cache-provider: basic` would switch to an
+open-source cache instead.
 
 ## Project layout
 
