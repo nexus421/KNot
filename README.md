@@ -168,7 +168,9 @@ Timestamps use `dd.MM.yyyy HH:mm:ss z` in the host time zone with English abbrev
 `19.09.2026 18:40:12 CEST`.
 
 **Logging.** stdout/stderr, forwarded to the journal by systemd. Rejected API keys are logged with the client
-address (`X-Forwarded-For` if set). API keys and SMTP passwords are never logged.
+address (`X-Forwarded-For` if set), at most 10 per minute plus one line when that is exceeded. So a flood of
+wrong keys cannot exceed journald's rate limit, which would drop the real entries too. Every rejected request
+still gets its `401`. API keys and SMTP passwords are never logged.
 
 ## Deployment
 

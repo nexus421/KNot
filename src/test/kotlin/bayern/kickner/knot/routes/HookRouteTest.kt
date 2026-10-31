@@ -1,5 +1,6 @@
 package bayern.kickner.knot.routes
 
+import bayern.kickner.klogger.KLogger
 import bayern.kickner.knot.RecordingTransport
 import bayern.kickner.knot.config.AppConfig
 import bayern.kickner.knot.knot
@@ -13,12 +14,22 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import jakarta.mail.Message
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 private const val GRAFANA_KEY = "grafana-key-0123456789"
 private const val OPS_KEY = "ops-key-0123456789"
+
+/** Collects the messages logged by the hook route. Klogger is global, so the destination is registered once per JVM. */
+private object HookRouteLog {
+    val lines = CopyOnWriteArrayList<String>()
+
+    init {
+        KLogger.configure { logToCustom { _, tag, message -> if (tag == "HookRoute") lines += message } }
+    }
+}
 
 private fun ApplicationTestBuilder.knotApp(
     config: AppConfig = testConfig(),
@@ -242,6 +253,33 @@ class HookRouteTest {
 
         assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
         assertEquals(0, transport.calls)
+    }
+
+    @Test
+    fun `rejected requests are logged at most ten times per minute regardless of the rate limit`() = testApplication {
+        knotApp(config = testConfig(rateLimitPerMinute = 1))
+        HookRouteLog.lines.clear()
+
+        repeat(25) { assertEquals(HttpStatusCode.Unauthorized, hook(apiKey = "wrong-key-0123456789").status) }
+
+        // Ten regular lines, then one line that announces the silence, then nothing
+        val rejections = HookRouteLog.lines.filter { it.startsWith("Rejected hook request") }
+        assertEquals(11, rejections.size)
+        assertTrue(rejections.take(10).none { it.contains("not logged") })
+        assertTrue(rejections.last().contains("further rejections are not logged"))
+    }
+
+    @Test
+    fun `a flood of wrong keys neither blocks nor silences valid requests`() = testApplication {
+        val transport = RecordingTransport()
+        knotApp(transport = transport)
+        HookRouteLog.lines.clear()
+
+        repeat(50) { hook(apiKey = "wrong-key-0123456789") }
+
+        assertEquals(HttpStatusCode.OK, hook(apiKey = OPS_KEY).status)
+        assertEquals(1, transport.calls)
+        assertTrue(HookRouteLog.lines.contains("Mail sent for target 'ops'"))
     }
 
     @Test

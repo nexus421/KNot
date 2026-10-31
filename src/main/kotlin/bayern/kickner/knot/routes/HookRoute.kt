@@ -26,6 +26,15 @@ private const val API_KEY_QUERY_PARAMETER = "apiKey"
 private const val RETRY_AFTER_SECONDS = "60"
 
 /**
+ * Rejected requests logged per minute. Without a cap, a flood of wrong keys exceeds journald's rate limit, and
+ * journald then drops every further line of the service, including real deliveries. Deliberately not configurable.
+ */
+private const val REJECTION_LOG_LIMIT_PER_MINUTE = 10
+
+/** The single key of the rejection log limiter. All rejected requests share one budget, whoever sends them. */
+private const val REJECTION_LOG_KEY = "rejected"
+
+/**
  * JSON payload of a hook request. Everything else in the document is ignored.
  *
  * @property subject Optional mail subject, blank falls back to the fixed default.
@@ -43,6 +52,10 @@ private val payloadJson = Json { ignoreUnknownKeys = true }
  *
  * When a target starts exceeding its limit, [systemNotifier] (if configured) is told once per episode. That
  * mail is sent in the background so the 429 does not wait for SMTP.
+ *
+ * Rejected requests (401) are logged at most [REJECTION_LOG_LIMIT_PER_MINUTE] times per minute, plus one line
+ * when that cap is first exceeded. Only the log is capped. Every rejected request still gets its 401, and
+ * requests with a valid key are not affected at all.
  */
 fun Route.hookRoute(
     config: AppConfig,
@@ -50,13 +63,19 @@ fun Route.hookRoute(
     rateLimiter: RateLimiter,
     systemNotifier: SystemNotifier?
 ) {
+    val rejectionLog = RateLimiter(REJECTION_LOG_LIMIT_PER_MINUTE)
+
     post("/hook") {
         val target = call.apiKey(config.allowApiKeyInQuery)?.let { config.targetForApiKey(it) }
         if (target == null) {
-            staticLog(
-                KLogger.Level.WARN,
-                TAG
-            ) { "Rejected hook request from ${call.clientAddress()}: missing or unknown API key" }
+            val rejected = "Rejected hook request from ${call.clientAddress()}: missing or unknown API key"
+            when (rejectionLog.tryAcquire(REJECTION_LOG_KEY)) {
+                Verdict.ALLOWED -> staticLog(KLogger.Level.WARN, TAG) { rejected }
+                Verdict.LIMIT_REACHED -> staticLog(KLogger.Level.WARN, TAG) {
+                    "$rejected. More than $REJECTION_LOG_LIMIT_PER_MINUTE rejections per minute, further rejections are not logged until a calm minute"
+                }
+                Verdict.REJECTED -> Unit
+            }
             return@post call.respond(HttpStatusCode.Unauthorized, "Missing or invalid API key")
         }
 
