@@ -29,7 +29,8 @@ every build. It is never committed.
 `knot.jar` and attaches it to the release together with `knot.jar.sha256`. A tag that does not match fails the run
 and attaches nothing.
 
-The actions in both workflows are pinned to commit hashes, the comment names the version. Update both together.
+The actions in both workflows use their major version tag (`@v7`, `@v6`), so minor releases and security fixes
+arrive without a change here. A new major version has to be raised by hand in both workflows.
 `gradle/actions/setup-gradle` v6 keeps its caching in a closed-source component under the Gradle Terms of Use
 (https://gradle.com/legal/terms-of-use/), using it means accepting them. `cache-provider: basic` would switch to an
 open-source cache instead.
