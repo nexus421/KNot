@@ -291,8 +291,39 @@ class HookRouteTest {
         assertTrue(response.bodyAsText().contains("wrong-key").not())
     }
 
-    private suspend fun ApplicationTestBuilder.hook(apiKey: String, body: String = """{"body": "x"}""") = client.post("/hook") {
+    @Test
+    fun `the last forwarded entry is logged as client address`() = testApplication {
+        knotApp()
+
+        assertEquals("198.51.100.7", loggedClientAddress(forwardedFor = "203.0.113.66, 198.51.100.7"))
+        assertEquals("2001:db8::1", loggedClientAddress(forwardedFor = "2001:db8::1"))
+    }
+
+    @Test
+    fun `a forwarded value that is no address falls back to the peer`() = testApplication {
+        knotApp()
+        val peer = loggedClientAddress(forwardedFor = null)
+
+        // The Ktor client refuses control characters like ESC in headers, so text and a tab stand in for them
+        for (forwarded in listOf("1.2.3.4 FAKE", "1.2.3.4\tFAKE", "A".repeat(8000), "", "1.2.3.4, evil")) {
+            assertEquals(peer, loggedClientAddress(forwardedFor = forwarded), forwarded.take(40))
+        }
+    }
+
+    /** Sends a request with a wrong key and returns the client address its log line names. */
+    private suspend fun ApplicationTestBuilder.loggedClientAddress(forwardedFor: String?): String {
+        HookRouteLog.lines.clear()
+        assertEquals(HttpStatusCode.Unauthorized, hook(apiKey = "wrong-key-0123456789", forwardedFor = forwardedFor).status)
+        return HookRouteLog.lines.single().removePrefix("Rejected hook request from ").substringBefore(": missing")
+    }
+
+    private suspend fun ApplicationTestBuilder.hook(
+        apiKey: String,
+        body: String = """{"body": "x"}""",
+        forwardedFor: String? = null
+    ) = client.post("/hook") {
         header("X-API-Key", apiKey)
+        forwardedFor?.let { header("X-Forwarded-For", it) }
         contentType(ContentType.Application.Json)
         setBody(body)
     }

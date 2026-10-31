@@ -33,7 +33,8 @@ KNot speaks plain HTTP and leaves TLS to a reverse proxy such as Caddy or Zoraxy
 when the proxy runs on the same machine. If it runs elsewhere, bind to the address the proxy reaches and allow the
 port only from the proxy, because the hop between them carries API keys and mail content in plaintext.
 
-- Let the proxy set `X-Forwarded-For`, KNot logs it as the client address of rejected requests.
+- Let the proxy set or append `X-Forwarded-For`. KNot logs its last entry as the client address of rejected
+  requests, see [Security](security.md#logging).
 - If KNot is reachable from the internet, limit requests per client address in the proxy, e.g. with a rate limit
   rule or fail2ban on the proxy's access log. KNot cannot do that itself, it only sees the proxy, see
   [Security](security.md#api-keys).

@@ -57,8 +57,10 @@ a DoS.
 - Rejected requests with the client address, at most 10 per minute plus one line when that is exceeded. Without
   that cap a flood of wrong keys would exceed journald's rate limit, and journald would then drop the real entries
   of the service as well. Every rejected request still gets its `401`.
-- The client address is the `X-Forwarded-For` header if present, else the connection peer. KNot takes the header as
-  sent, so it is only as trustworthy as the proxy that sets it.
+- The client address is the last entry of `X-Forwarded-For`, the one the proxy appends itself. Entries before it
+  come from the client and are ignored. If the header is missing or its last entry is no IP address, the
+  connection peer is logged instead, so a client cannot put control characters or long text into the log. The
+  address is only as trustworthy as the proxy in front of KNot: without one, a client can name any address.
 - API keys and SMTP passwords are never logged. `Target` and `SmtpConfig` leave them out of `toString`.
 
 ## Config file

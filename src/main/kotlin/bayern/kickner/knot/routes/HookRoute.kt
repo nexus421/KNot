@@ -113,11 +113,19 @@ fun Route.hookRoute(
     }
 }
 
+/** An IPv4 or IPv6 address in text form, at most 45 characters long. A loose check, it only keeps other text out. */
+private val ipAddress = Regex("[0-9a-fA-F.:]{1,45}")
+
 /**
- * Behind the reverse proxy the connection peer is always the proxy. Its forwarded header names the real client.
- * The IP address, not the host name: that would cost a reverse DNS lookup and log a name the client controls.
+ * Behind the reverse proxy the connection peer is always the proxy, so the forwarded header names the real client.
+ * Only its last entry counts, because the proxy appends that one itself and everything before it comes from the
+ * client. An entry that is no IP address is ignored and the peer is logged instead, so a client cannot put control
+ * characters or long text into the log. The IP address, not the host name: that would cost a reverse DNS lookup.
  */
-private fun RoutingCall.clientAddress(): String = request.header("X-Forwarded-For") ?: request.origin.remoteAddress
+private fun RoutingCall.clientAddress(): String =
+    request.headers.getAll("X-Forwarded-For")?.lastOrNull()?.substringAfterLast(',')?.trim()
+        ?.takeIf { ipAddress.matches(it) }
+        ?: request.origin.remoteAddress
 
 /** The presented API key: the header wins, the query parameter only counts when enabled. Blank values count as absent. */
 private fun RoutingCall.apiKey(allowQueryParameter: Boolean): String? {
