@@ -14,7 +14,9 @@ private const val MIN_API_KEY_LENGTH = 16
  * Unknown keys are errors, so a typo cannot silently fall back to a default. Every validation issue is
  * collected into one message, so a broken config needs only one restart to fix.
  *
- * @return the config, or a human-readable failure message that never contains the file content (it holds secrets).
+ * @return the config, or a human-readable failure message. A parse failure keeps only the first line of the
+ * parser's message, which names the position and at most the offending token, never the whole document. A secret
+ * in a wrongly typed field (a boolean, an enum, a key name) can still show up as that token.
  */
 fun loadConfig(path: String): ResultOf2<AppConfig, String> {
     val file = File(path)

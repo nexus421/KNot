@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.4.20"
-    kotlin("plugin.serialization") version "2.4.20"
-    id("io.ktor.plugin") version "3.6.0"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.serialization") version "2.4.21"
+    id("io.ktor.plugin") version "3.6.1"
 }
 
 group = "bayern.kickner"
@@ -16,13 +16,13 @@ repositories {
 }
 
 dependencies {
-    implementation("bayern.kickner:Klogger:0.4.0")
+    implementation("bayern.kickner:Klogger:0.5.0")
     implementation("bayern.kickner:KotNexLib:4.4.1")
 
     implementation("io.ktor:ktor-server-core")
     implementation("io.ktor:ktor-server-cio")
     implementation("io.ktor:ktor-server-body-limit")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     implementation("jakarta.mail:jakarta.mail-api:2.1.5")
     runtimeOnly("org.eclipse.angus:angus-mail:2.0.5")

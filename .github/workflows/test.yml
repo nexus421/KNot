@@ -13,13 +13,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: corretto
           java-version: 25
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
-      - run: ./gradlew test
+      - run: ./gradlew test buildFatJar
+
+      # Klogger must be the SLF4J provider in the fat JAR, otherwise Ktor's warnings and errors are lost
+      - name: Check SLF4J provider in the fat JAR
+        run: test "$(unzip -p build/libs/knot.jar META-INF/services/org.slf4j.spi.SLF4JServiceProvider)" = "bayern.kickner.klogger.slf4j.KloggerServiceProvider"
